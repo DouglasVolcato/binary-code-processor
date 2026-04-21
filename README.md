@@ -1,6 +1,6 @@
 # binary-code-processer
 
-Sistem that turns messages into binary code. It was made using Golang, TDD, Clean Architecture and following scalability principles.
+Distributed sistem that turns messages into binary code. It was made using Golang, TDD, Clean Architecture and following scalability principles.
 
 ## Technologies:
 - Golang: Code lannguage
