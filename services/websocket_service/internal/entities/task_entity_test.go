@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type testDataType struct {
+type testDataTaskEntity struct {
 	ID         string
 	Message    string
 	BinaryData []byte
@@ -15,9 +15,9 @@ type testDataType struct {
 	UpdatedAt  string
 }
 
-func makeFakeDataTaskEntity() *testDataType {
+func makeFakeDataTaskEntity() *testDataTaskEntity {
 	faker := test.FakeData{}
-	return &testDataType{
+	return &testDataTaskEntity{
 		ID:         faker.ID(),
 		Message:    faker.Phrase(),
 		BinaryData: faker.Binary(),
