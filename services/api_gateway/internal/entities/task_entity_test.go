@@ -3,11 +3,11 @@ package entities
 import (
 	"testing"
 
-	faker "github.com/go-faker/faker/v4"
+	"github.com/douglasvolcato/task-monitor/api_gateway/test"
 	"github.com/stretchr/testify/assert"
 )
 
-type TestData struct {
+type testData struct {
 	ID         string
 	Message    string
 	BinaryData []byte
@@ -15,112 +15,113 @@ type TestData struct {
 	UpdatedAt  string
 }
 
-func MakeTestData() TestData {
-	return TestData{
-		ID:         faker.UUIDDigit(),
-		Message:    faker.Sentence(),
-		BinaryData: []byte(faker.Paragraph()),
+func MakeTestData() testData {
+	return testData{
+		ID:         faker.ID(),
+		Message:    faker.Phrase(),
+		BinaryData: faker.Binary(),
 		CreatedAt:  faker.Date(),
 		UpdatedAt:  faker.Date(),
 	}
 }
 
-var testData = MakeTestData()
+var faker = test.FakeData{}
+var fakeData = MakeTestData()
 
 func TestNewTaskShouldCreateTask(t *testing.T) {
 	sut := NewTask(
-		testData.ID,
-		testData.Message,
-		testData.BinaryData,
-		testData.CreatedAt,
-		testData.UpdatedAt,
+		fakeData.ID,
+		fakeData.Message,
+		fakeData.BinaryData,
+		fakeData.CreatedAt,
+		fakeData.UpdatedAt,
 	)
 	assert.NotNil(t, sut)
-	assert.Equal(t, testData.ID, sut.ID)
-	assert.Equal(t, testData.Message, sut.Message)
-	assert.Equal(t, testData.BinaryData, sut.BinaryData)
-	assert.Equal(t, testData.CreatedAt, sut.CreatedAt)
-	assert.Equal(t, testData.UpdatedAt, sut.UpdatedAt)
+	assert.Equal(t, fakeData.ID, sut.ID)
+	assert.Equal(t, fakeData.Message, sut.Message)
+	assert.Equal(t, fakeData.BinaryData, sut.BinaryData)
+	assert.Equal(t, fakeData.CreatedAt, sut.CreatedAt)
+	assert.Equal(t, fakeData.UpdatedAt, sut.UpdatedAt)
 }
 
 func TestValidateShouldReturnErrorIfDataIsInvalid(t *testing.T) {
 	err := NewTask(
 		"",
-		testData.Message,
-		testData.BinaryData,
-		testData.CreatedAt,
-		testData.UpdatedAt,
+		fakeData.Message,
+		fakeData.BinaryData,
+		fakeData.CreatedAt,
+		fakeData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		testData.ID,
+		fakeData.ID,
 		"",
-		testData.BinaryData,
-		testData.CreatedAt,
-		testData.UpdatedAt,
+		fakeData.BinaryData,
+		fakeData.CreatedAt,
+		fakeData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		testData.ID,
-		testData.Message,
+		fakeData.ID,
+		fakeData.Message,
 		([]byte)(""),
-		testData.CreatedAt,
-		testData.UpdatedAt,
+		fakeData.CreatedAt,
+		fakeData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		testData.ID,
-		testData.Message,
-		testData.BinaryData,
+		fakeData.ID,
+		fakeData.Message,
+		fakeData.BinaryData,
 		"",
-		testData.UpdatedAt,
+		fakeData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		testData.ID,
-		testData.Message,
-		testData.BinaryData,
-		testData.CreatedAt,
+		fakeData.ID,
+		fakeData.Message,
+		fakeData.BinaryData,
+		fakeData.CreatedAt,
 		"",
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
 		" ",
-		testData.Message,
-		testData.BinaryData,
-		testData.CreatedAt,
-		testData.UpdatedAt,
+		fakeData.Message,
+		fakeData.BinaryData,
+		fakeData.CreatedAt,
+		fakeData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		testData.ID,
+		fakeData.ID,
 		" ",
-		testData.BinaryData,
-		testData.CreatedAt,
-		testData.UpdatedAt,
+		fakeData.BinaryData,
+		fakeData.CreatedAt,
+		fakeData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		testData.ID,
-		testData.Message,
+		fakeData.ID,
+		fakeData.Message,
 		([]byte)(" "),
-		testData.CreatedAt,
-		testData.UpdatedAt,
+		fakeData.CreatedAt,
+		fakeData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		testData.ID,
-		testData.Message,
-		testData.BinaryData,
+		fakeData.ID,
+		fakeData.Message,
+		fakeData.BinaryData,
 		" ",
-		testData.UpdatedAt,
+		fakeData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		testData.ID,
-		testData.Message,
-		testData.BinaryData,
-		testData.CreatedAt,
+		fakeData.ID,
+		fakeData.Message,
+		fakeData.BinaryData,
+		fakeData.CreatedAt,
 		" ",
 	).Validate()
 	assert.Error(t, err)
@@ -128,11 +129,11 @@ func TestValidateShouldReturnErrorIfDataIsInvalid(t *testing.T) {
 
 func TestValidateShouldReturnNilIfDataIsValid(t *testing.T) {
 	err := NewTask(
-		testData.ID,
-		testData.Message,
-		testData.BinaryData,
-		testData.CreatedAt,
-		testData.UpdatedAt,
+		fakeData.ID,
+		fakeData.Message,
+		fakeData.BinaryData,
+		fakeData.CreatedAt,
+		fakeData.UpdatedAt,
 	).Validate()
 	assert.NoError(t, err)
 }
