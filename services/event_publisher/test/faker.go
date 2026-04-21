@@ -10,6 +10,10 @@ func (f *FakeData) ID() string {
 	return faker.UUIDDigit()
 }
 
+func (f *FakeData) Word() string {
+	return faker.Word()
+}
+
 func (f *FakeData) Phrase() string {
 	return faker.Sentence()
 }
