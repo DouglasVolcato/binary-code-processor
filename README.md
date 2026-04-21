@@ -1,15 +1,15 @@
 # binary-code-processer
 
-Distributed sistem that turns messages into binary code. It was made using Golang, TDD, Clean Architecture and following scalability principles.
+Distributed sistem that processes messages and turns it into binary code. It was made using Golang, TDD, Clean Architecture and following scalability principles.
 
 ## Technologies:
 - Golang: Code lannguage
-- WebSocket: Used to show real time statuses
+- WebSocket: Used to get real time statuses
 - RabbitMQ: Used to queue processes
 - GraphQL: Used to simpify the api interaction
-- gRPC: USed to simplify the microservices interaction
+- gRPC: Used to simplify the microservices interaction
 - Postgres: Database
-- Kubernetes: Used to scale the services
+- Kubernetes: Used to manage the containers and scale services
 
 ## Architecture:
 <img src="docs/diagram.png">
