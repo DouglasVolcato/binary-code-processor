@@ -1,4 +1,4 @@
-# binary-code-processer
+# binary-code-processor
 
 Distributed sistem that processes messages and turns it into binary code. It was made using Golang, TDD, Clean Architecture and following scalability principles.
 

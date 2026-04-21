@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/douglasvolcato/binary-code-processer/api_gateway/test"
+	"github.com/douglasvolcato/binary-code-processor/api_gateway/test"
 	"github.com/stretchr/testify/assert"
 )
 

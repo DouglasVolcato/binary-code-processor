@@ -1,4 +1,4 @@
-module github.com/douglasvolcato/binary-code-processer/task_service
+module github.com/douglasvolcato/binary-code-processor/task_service
 
 go 1.25.1
 

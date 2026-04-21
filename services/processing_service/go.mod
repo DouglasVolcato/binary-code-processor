@@ -1,4 +1,4 @@
-module github.com/douglasvolcato/binary-code-processer/processing_service
+module github.com/douglasvolcato/binary-code-processor/processing_service
 
 go 1.25.1
 

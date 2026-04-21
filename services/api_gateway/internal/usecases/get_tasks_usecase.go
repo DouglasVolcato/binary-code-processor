@@ -1,6 +1,6 @@
 package usecases
 
-import "github.com/douglasvolcato/binary-code-processer/api_gateway/internal/entities"
+import "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
 
 type GetTasksUseCase struct {
 	Repo TaskRepositoryInterface

@@ -222,7 +222,7 @@ const file_task_proto_rawDesc = "" +
 	"\x05tasks\x18\x01 \x03(\tR\x05tasks2\xad\x01\n" +
 	"\vTaskService\x12a\n" +
 	"\x14ReceiveTaskToProcess\x12!.task.ReceiveTaskToProcessRequest\x1a\".task.ReceiveTaskToProcessResponse\"\x00(\x01\x12;\n" +
-	"\bGetTasks\x12\x15.task.GetTasksRequest\x1a\x16.task.GetTasksResponse\"\x00BRZPgithub.com/douglasvolcato/binary-code-processer/api_gateway/internal/infra/grpc/task;taskb\x06proto3"
+	"\bGetTasks\x12\x15.task.GetTasksRequest\x1a\x16.task.GetTasksResponse\"\x00BRZPgithub.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task;taskb\x06proto3"
 
 var (
 	file_task_proto_rawDescOnce sync.Once

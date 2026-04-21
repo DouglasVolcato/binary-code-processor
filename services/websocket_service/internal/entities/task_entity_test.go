@@ -3,7 +3,7 @@ package entities
 import (
 	"testing"
 
-	"github.com/douglasvolcato/binary-code-processer/websocket_service/test"
+	"github.com/douglasvolcato/binary-code-processor/websocket_service/test"
 	"github.com/stretchr/testify/assert"
 )
 

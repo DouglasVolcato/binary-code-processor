@@ -1,4 +1,4 @@
-module github.com/douglasvolcato/binary-code-processer/websocket_service
+module github.com/douglasvolcato/binary-code-processor/websocket_service
 
 go 1.25.1
 
