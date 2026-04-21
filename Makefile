@@ -6,11 +6,11 @@ build:
 	@$(MAKE) build-websocket_service
 
 test:
-	@$(MAKE) test-api_gateway
-	@$(MAKE) test-event_publisher
-	@$(MAKE) test-processing_service
-	@$(MAKE) test-task_service
-	@$(MAKE) test-websocket_service
+	@$(MAKE) test-v-api_gateway
+	@$(MAKE) test-v-event_publisher
+	@$(MAKE) test-v-processing_service
+	@$(MAKE) test-v-task_service
+	@$(MAKE) test-v-websocket_service
 
 test-cover:
 	@$(MAKE) test-coverage-api_gateway
