@@ -1,0 +1,24 @@
+mode: set
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/event_entity.go:14.48,19.2 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/event_entity.go:21.34,22.39 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/event_entity.go:22.39,24.3 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/event_entity.go:25.2,25.42 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/event_entity.go:25.42,27.3 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/event_entity.go:28.2,28.12 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:17.102,25.2 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:27.33,28.35 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:28.35,30.3 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:31.2,31.40 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:31.40,33.3 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:34.2,34.51 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:34.51,36.3 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:37.2,37.42 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:37.42,39.3 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:40.2,40.42 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:40.42,42.3 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/internal/entities/task_entity.go:43.2,43.12 1 1
+github.com/douglasvolcato/binary-code-processer/websocket_service/test/faker.go:9.32,11.2 1 0
+github.com/douglasvolcato/binary-code-processer/websocket_service/test/faker.go:13.34,15.2 1 0
+github.com/douglasvolcato/binary-code-processer/websocket_service/test/faker.go:17.36,19.2 1 0
+github.com/douglasvolcato/binary-code-processer/websocket_service/test/faker.go:21.36,23.2 1 0
+github.com/douglasvolcato/binary-code-processer/websocket_service/test/faker.go:25.34,27.2 1 0
