@@ -27,19 +27,19 @@ test-bench:
 	@$(MAKE) test-bench-websocket_service
 
 build-api_gateway:
-	cd services/api_gateway && GOOS=linux GOARCH=amd64 go build -o api_gateway main.go
+	cd services/api_gateway && GOOS=linux GOARCH=amd64 go build -o bin/api_gateway cmd/main.go
 
 build-event_publisher:
-	cd services/event_publisher && GOOS=linux GOARCH=amd64 go build -o event_publisher main.go
+	cd services/event_publisher && GOOS=linux GOARCH=amd64 go build -o bin/event_publisher cmd/main.go
 
 build-processing_service:
-	cd services/processing_service && GOOS=linux GOARCH=amd64 go build -o processing_service main.go
+	cd services/processing_service && GOOS=linux GOARCH=amd64 go build -o bin/processing_service cmd/main.go
 
 build-task_service:
-	cd services/task_service && GOOS=linux GOARCH=amd64 go build -o task_service main.go
+	cd services/task_service && GOOS=linux GOARCH=amd64 go build -o bin/task_service cmd/main.go
 
 build-websocket_service:
-	cd services/websocket_service && GOOS=linux GOARCH=amd64 go build -o websocket_service main.go
+	cd services/websocket_service && GOOS=linux GOARCH=amd64 go build -o bin/websocket_service cmd/main.go
 
 test-v-api_gateway:
 	cd services/api_gateway && go test -v ./...
