@@ -26,27 +26,6 @@ func NewTask(id string, message string, binaryData []byte, createdAt string, upd
 	}
 }
 
-func TestNewTaskShouldCreateTask(t *testing.T) {
-	id := faker.UUIDDigit()
-	message := faker.Sentence()
-	binaryData := []byte(faker.Paragraph())
-	createdAt := faker.Date()
-	updatedAt := faker.Date()
-	sut := NewTask(
-		id,
-		message,
-		binaryData,
-		createdAt,
-		updatedAt,
-	)
-	assert.NotNil(t, sut)
-	assert.Equal(t, id, sut.ID)
-	assert.Equal(t, message, sut.Message)
-	assert.Equal(t, binaryData, sut.BinaryData)
-	assert.Equal(t, createdAt, sut.CreatedAt)
-	assert.Equal(t, updatedAt, sut.UpdatedAt)
-}
-
 func (t *Task) Validate() error {
 	if strings.TrimSpace(t.ID) == "" {
 		return assert.AnError
@@ -66,92 +45,134 @@ func (t *Task) Validate() error {
 	return nil
 }
 
+///////////////////////////
+
+type TestData struct {
+	ID         string
+	Message    string
+	BinaryData []byte
+	CreatedAt  string
+	UpdatedAt  string
+}
+
+func MakeTestData() TestData {
+	return TestData{
+		ID:         faker.UUIDDigit(),
+		Message:    faker.Sentence(),
+		BinaryData: []byte(faker.Paragraph()),
+		CreatedAt:  faker.Date(),
+		UpdatedAt:  faker.Date(),
+	}
+}
+
+var testData = MakeTestData()
+
+func TestNewTaskShouldCreateTask(t *testing.T) {
+	sut := NewTask(
+		testData.ID,
+		testData.Message,
+		testData.BinaryData,
+		testData.CreatedAt,
+		testData.UpdatedAt,
+	)
+	assert.NotNil(t, sut)
+	assert.Equal(t, testData.ID, sut.ID)
+	assert.Equal(t, testData.Message, sut.Message)
+	assert.Equal(t, testData.BinaryData, sut.BinaryData)
+	assert.Equal(t, testData.CreatedAt, sut.CreatedAt)
+	assert.Equal(t, testData.UpdatedAt, sut.UpdatedAt)
+}
+
 func TestValidateShouldReturnErrorIfDataIsInvalid(t *testing.T) {
-	id := faker.UUIDDigit()
-	message := faker.Sentence()
-	binaryData := []byte(faker.Paragraph())
-	createdAt := faker.Date()
-	updatedAt := faker.Date()
 	err := NewTask(
 		"",
-		message,
-		binaryData,
-		createdAt,
-		updatedAt,
+		testData.Message,
+		testData.BinaryData,
+		testData.CreatedAt,
+		testData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		id,
+		testData.ID,
 		"",
-		binaryData,
-		createdAt,
-		updatedAt,
+		testData.BinaryData,
+		testData.CreatedAt,
+		testData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		id,
-		message,
+		testData.ID,
+		testData.Message,
 		([]byte)(""),
-		createdAt,
-		updatedAt,
+		testData.CreatedAt,
+		testData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		id,
-		message,
-		binaryData,
+		testData.ID,
+		testData.Message,
+		testData.BinaryData,
 		"",
-		updatedAt,
+		testData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		id,
-		message,
-		binaryData,
-		createdAt,
+		testData.ID,
+		testData.Message,
+		testData.BinaryData,
+		testData.CreatedAt,
 		"",
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
 		" ",
-		message,
-		binaryData,
-		createdAt,
-		updatedAt,
+		testData.Message,
+		testData.BinaryData,
+		testData.CreatedAt,
+		testData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		id,
+		testData.ID,
 		" ",
-		binaryData,
-		createdAt,
-		updatedAt,
+		testData.BinaryData,
+		testData.CreatedAt,
+		testData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		id,
-		message,
+		testData.ID,
+		testData.Message,
 		([]byte)(" "),
-		createdAt,
-		updatedAt,
+		testData.CreatedAt,
+		testData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		id,
-		message,
-		binaryData,
+		testData.ID,
+		testData.Message,
+		testData.BinaryData,
 		" ",
-		updatedAt,
+		testData.UpdatedAt,
 	).Validate()
 	assert.Error(t, err)
 	err = NewTask(
-		id,
-		message,
-		binaryData,
-		createdAt,
+		testData.ID,
+		testData.Message,
+		testData.BinaryData,
+		testData.CreatedAt,
 		" ",
 	).Validate()
 	assert.Error(t, err)
 }
 
-// func TestValidateShouldValidateData(t *testing.T) {}
+func TestValidateShouldReturnNilIfDataIsValid(t *testing.T) {
+	err := NewTask(
+		testData.ID,
+		testData.Message,
+		testData.BinaryData,
+		testData.CreatedAt,
+		testData.UpdatedAt,
+	).Validate()
+	assert.NoError(t, err)
+}
