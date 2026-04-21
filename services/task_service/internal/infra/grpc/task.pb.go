@@ -315,7 +315,7 @@ const file_task_proto_rawDesc = "" +
 	"\vTaskService\x12a\n" +
 	"\x14ReceiveTaskToProcess\x12!.task.ReceiveTaskToProcessRequest\x1a\".task.ReceiveTaskToProcessResponse\"\x00(\x01\x12X\n" +
 	"\x11SendProcessedTask\x12\x1e.task.SendProcessedTaskRequest\x1a\x1f.task.SendProcessedTaskResponse\"\x00(\x01\x12;\n" +
-	"\bGetTasks\x12\x15.task.GetTasksRequest\x1a\x16.task.GetTasksResponse\"\x00BSZQgithub.com/douglasvolcato/task-monitor/task_service/internal/infra/grpc/task;taskb\x06proto3"
+	"\bGetTasks\x12\x15.task.GetTasksRequest\x1a\x16.task.GetTasksResponse\"\x00BSZQgithub.com/douglasvolcato/binary-code-processer/task_service/internal/infra/grpc/task;taskb\x06proto3"
 
 var (
 	file_task_proto_rawDescOnce sync.Once

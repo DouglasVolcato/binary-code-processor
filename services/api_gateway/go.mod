@@ -1,4 +1,4 @@
-module github.com/douglasvolcato/task-monitor/api_gateway
+module github.com/douglasvolcato/binary-code-processer/api_gateway
 
 go 1.25.1
 
