@@ -1,3 +1,4 @@
+X scripts makefile
 -usecases de cada serviço com suas abstracoes e testes de mocks
 -containers docker e docker compose geral
 -integração com banco de dados
