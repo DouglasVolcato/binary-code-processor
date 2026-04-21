@@ -45,3 +45,6 @@ Sistem that turns messages into binary code. It was made using Golang, TDD, Clea
 ### 6 - WebSocket Service
 - Consumes events from RabbitMQ (fanout)
 - Sends realtime updates to connected clients
+
+## Author:
+<a href="https://github.com/DouglasVolcato?tab=repositories">Douglas Volcato</a>
