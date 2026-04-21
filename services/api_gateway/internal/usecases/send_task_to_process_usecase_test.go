@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
 	"github.com/douglasvolcato/binary-code-processor/api_gateway/test"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,16 +14,16 @@ type mockTaskProcessor struct {
 	SendTaskToProcessArgs  struct {
 		Messages []string
 	}
-	SendTaskToProcessFunc func(messages []string) error
+	SendTaskToProcessFunc func(messages []string) ([]entities.Task, error)
 }
 
-func (m *mockTaskProcessor) SendTaskToProcess(messages []string) error {
+func (m *mockTaskProcessor) SendTaskToProcess(messages []string) ([]entities.Task, error) {
 	m.SendTaskToProcessCalls++
 	m.SendTaskToProcessArgs.Messages = messages
 	if m.SendTaskToProcessFunc != nil {
 		return m.SendTaskToProcessFunc(messages)
 	}
-	return nil
+	return nil, nil
 }
 
 func makeFakeMessages(count int) []string {
@@ -46,8 +47,8 @@ func TestSendTaskExecuteShouldCallRepoWithInputValues(t *testing.T) {
 	expectedMessages := makeFakeMessages(3)
 
 	repo := &mockTaskProcessor{
-		SendTaskToProcessFunc: func(messages []string) error {
-			return nil
+		SendTaskToProcessFunc: func(messages []string) ([]entities.Task, error) {
+			return nil, nil
 		},
 	}
 	sut := NewSendTaskToProcessUseCase(repo)
@@ -68,8 +69,8 @@ func TestSendTaskExecuteShouldCallRepoWithInputValues(t *testing.T) {
 func TestSendTaskExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedError := errors.New("repo failure")
 	repo := &mockTaskProcessor{
-		SendTaskToProcessFunc: func(messages []string) error {
-			return expectedError
+		SendTaskToProcessFunc: func(messages []string) ([]entities.Task, error) {
+			return nil, expectedError
 		},
 	}
 	sut := NewSendTaskToProcessUseCase(repo)

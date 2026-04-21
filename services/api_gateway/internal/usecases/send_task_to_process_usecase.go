@@ -22,11 +22,12 @@ type SendTaskToProcessOutput struct {
 }
 
 func (u *SendTaskToProcessUseCase) Execute(input *SendTaskToProcessInput) (*SendTaskToProcessOutput, error) {
-	err := u.Repo.SendTaskToProcess(input.Messages)
+	tasks, err := u.Repo.SendTaskToProcess(input.Messages)
 	if err != nil {
 		return nil, err
 	}
 	return &SendTaskToProcessOutput{
 		Success: true,
+		Tasks:   tasks,
 	}, nil
 }

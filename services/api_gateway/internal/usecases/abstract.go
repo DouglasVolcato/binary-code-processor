@@ -7,5 +7,5 @@ type TaskRepositoryInterface interface {
 }
 
 type TaskProcessorInterface interface {
-	SendTaskToProcess(messages []string) error
+	SendTaskToProcess(messages []string) ([]entities.Task, error)
 }
