@@ -2,15 +2,11 @@ package usecases
 
 import "github.com/douglasvolcato/binary-code-processer/api_gateway/internal/entities"
 
-type TaskRepository interface {
-	GetTasks(limit int, offset int) ([]entities.Task, error)
-}
-
 type GetTasksUseCase struct {
-	Repo TaskRepository
+	Repo TaskRepositoryInterface
 }
 
-func NewGetTasksUseCase(repo TaskRepository) *GetTasksUseCase {
+func NewGetTasksUseCase(repo TaskRepositoryInterface) *GetTasksUseCase {
 	return &GetTasksUseCase{
 		Repo: repo,
 	}
