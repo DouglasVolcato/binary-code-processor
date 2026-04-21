@@ -1,4 +1,6 @@
-# task-monitor
+# binary-code-processer
+
+Sistem that turns messages into binary code. It was made using Golang, TDD, Clean Architecture and following scalability principles.
 
 ## Technologies:
 - Golang: Code lannguage
@@ -9,7 +11,9 @@
 - Postgres: Database
 - Kubernetes: Used to scale the services
 
-## Features:
+## Architecture:
+<img src="docs/diagram.png">
+
 ### 1 - Client
 - Fetches tasks from API Gateway (GraphQL)
 - Sends tasks using GraphQL
