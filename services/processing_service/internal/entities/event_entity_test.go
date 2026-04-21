@@ -3,7 +3,7 @@ package entities
 import (
 	"testing"
 
-	"github.com/douglasvolcato/task-monitor/processing_service/test"
+	"github.com/douglasvolcato/binary-code-processer/processing_service/test"
 	"github.com/stretchr/testify/assert"
 )
 

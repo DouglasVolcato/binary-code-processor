@@ -1,4 +1,4 @@
-module github.com/douglasvolcato/task-monitor/event_publisher
+module github.com/douglasvolcato/binary-code-processer/event_publisher
 
 go 1.25.1
 
