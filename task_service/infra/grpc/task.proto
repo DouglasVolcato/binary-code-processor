@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+option go_package = "github.com/douglasvolcato/task-monitor/task_service/infra/grpc/task;task";
+
+package task;
+
+service TaskService {
+  rpc ReceiveTaskToProcess (stream ReceiveTaskToProcessRequest) returns (ReceiveTaskToProcessResponse) {}
+  rpc SendProcessedTask (stream SendProcessedTaskRequest) returns (SendProcessedTaskResponse) {}
+  rpc GetTasks (GetTasksRequest) returns (GetTasksResponse) {}
+}
+
+message ReceiveTaskToProcessRequest {
+  repeated string message = 1;
+}
+
+message ReceiveTaskToProcessResponse {
+  string message = 1;
+}
+
+message SendProcessedTaskRequest {
+  repeated string message = 1;
+}
+
+message SendProcessedTaskResponse {
+  string message = 1;
+}
+
+message GetTasksRequest {
+  string limit = 1;
+  string offset = 2;
+}
+
+message GetTasksResponse {
+  repeated string tasks = 1;
+}

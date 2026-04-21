@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+option go_package = "github.com/douglasvolcato/task-monitor/api_gateway/infra/grpc/task;task";
+
+package task;
+
+service TaskService {
+  rpc ReceiveTaskToProcess (stream ReceiveTaskToProcessRequest) returns (ReceiveTaskToProcessResponse) {}
+  rpc GetTasks (GetTasksRequest) returns (GetTasksResponse) {}
+}
+
+message ReceiveTaskToProcessRequest {
+  repeated string message = 1;
+}
+
+message ReceiveTaskToProcessResponse {
+  string message = 1;
+}
+
+message GetTasksRequest {
+  string limit = 1;
+  string offset = 2;
+}
+
+message GetTasksResponse {
+  repeated string tasks = 1;
+}

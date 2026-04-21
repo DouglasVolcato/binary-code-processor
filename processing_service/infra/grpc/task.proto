@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option go_package = "github.com/douglasvolcato/task-monitor/processing_service/infra/grpc/task;task";
+
+package task;
+
+service TaskService {
+  rpc SendProcessedTask (stream SendProcessedTaskRequest) returns (SendProcessedTaskResponse) {}
+}
+
+message SendProcessedTaskRequest {
+  repeated string message = 1;
+}
+
+message SendProcessedTaskResponse {
+  string message = 1;
+}
+
