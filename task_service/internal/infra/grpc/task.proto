@@ -1,11 +1,12 @@
 syntax = "proto3";
 
-option go_package = "github.com/douglasvolcato/task-monitor/api_gateway/infra/grpc/task;task";
+option go_package = "github.com/douglasvolcato/task-monitor/task_service/internal/infra/grpc/task;task";
 
 package task;
 
 service TaskService {
   rpc ReceiveTaskToProcess (stream ReceiveTaskToProcessRequest) returns (ReceiveTaskToProcessResponse) {}
+  rpc SendProcessedTask (stream SendProcessedTaskRequest) returns (SendProcessedTaskResponse) {}
   rpc GetTasks (GetTasksRequest) returns (GetTasksResponse) {}
 }
 
@@ -14,6 +15,14 @@ message ReceiveTaskToProcessRequest {
 }
 
 message ReceiveTaskToProcessResponse {
+  string message = 1;
+}
+
+message SendProcessedTaskRequest {
+  repeated string message = 1;
+}
+
+message SendProcessedTaskResponse {
   string message = 1;
 }
 

@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option go_package = "github.com/douglasvolcato/task-monitor/processing_service/infra/grpc/task;task";
+option go_package = "github.com/douglasvolcato/task-monitor/processing_service/internal/infra/grpc/task;task";
 
 package task;
 
