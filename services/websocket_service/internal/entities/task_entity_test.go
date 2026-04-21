@@ -43,7 +43,7 @@ func TestNewTaskShouldCreateTask(t *testing.T) {
 	assert.Equal(t, testData.UpdatedAt, sut.UpdatedAt)
 }
 
-func TestValidateShouldReturnErrorIfDataIsInvalid(t *testing.T) {
+func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	testData := makeFakeDataTaskEntity()
 	err := NewTask(
 		"",
@@ -127,7 +127,7 @@ func TestValidateShouldReturnErrorIfDataIsInvalid(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestValidateShouldReturnNilIfDataIsValid(t *testing.T) {
+func TestValidateShouldReturnNilIfTaskDataIsValid(t *testing.T) {
 	testData := makeFakeDataTaskEntity()
 	err := NewTask(
 		testData.ID,
