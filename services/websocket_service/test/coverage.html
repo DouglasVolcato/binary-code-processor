@@ -57,9 +57,9 @@
 				
 				<option value="file0">github.com/douglasvolcato/binary-code-processor/websocket_service/cmd/main.go (0.0%)</option>
 				
-				<option value="file1">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/event_entity.go (100.0%)</option>
+				<option value="file1">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/task_entity.go (100.0%)</option>
 				
-				<option value="file2">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/task_entity.go (100.0%)</option>
+				<option value="file2">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/usecases/send_processed_tasks_usecase.go (100.0%)</option>
 				
 				<option value="file3">github.com/douglasvolcato/binary-code-processor/websocket_service/test/faker.go (0.0%)</option>
 				
@@ -83,77 +83,59 @@ func main() {<span class="cov0" title="0">}</span>
 		<pre class="file" id="file1" style="display: none">package entities
 
 import (
+        "errors"
         "strings"
-
-        "github.com/stretchr/testify/assert"
-)
-
-type Event struct {
-        Task   Task
-        Status string
-}
-
-func NewEvent(task Task, status string) *Event <span class="cov8" title="1">{
-        return &amp;Event{
-                Task:   task,
-                Status: status,
-        }
-}</span>
-
-func (e *Event) Validate() error <span class="cov8" title="1">{
-        if strings.TrimSpace(e.Status) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
-        }</span>
-        <span class="cov8" title="1">if err := e.Task.Validate(); err != nil </span><span class="cov8" title="1">{
-                return err
-        }</span>
-        <span class="cov8" title="1">return nil</span>
-}
-</pre>
-		
-		<pre class="file" id="file2" style="display: none">package entities
-
-import (
-        "strings"
-
-        "github.com/stretchr/testify/assert"
 )
 
 type Task struct {
         ID         string
-        Message    string
         BinaryCode string
-        CreatedAt  string
-        UpdatedAt  string
 }
 
-func NewTask(id string, message string, binaryCode string, createdAt string, updatedAt string) *Task <span class="cov8" title="1">{
+func NewTask(id string, binaryCode string) *Task <span class="cov8" title="1">{
         return &amp;Task{
                 ID:         id,
-                Message:    message,
                 BinaryCode: binaryCode,
-                CreatedAt:  createdAt,
-                UpdatedAt:  updatedAt,
         }
 }</span>
 
 func (t *Task) Validate() error <span class="cov8" title="1">{
         if strings.TrimSpace(t.ID) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
-        }</span>
-        <span class="cov8" title="1">if strings.TrimSpace(t.Message) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+                return errors.New("invalid task id")
         }</span>
         <span class="cov8" title="1">if strings.TrimSpace(string(t.BinaryCode)) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
-        }</span>
-        <span class="cov8" title="1">if strings.TrimSpace(t.CreatedAt) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
-        }</span>
-        <span class="cov8" title="1">if strings.TrimSpace(t.UpdatedAt) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+                return errors.New("invalid task binary code")
         }</span>
         <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">package usecases
+
+import "github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities"
+
+type SendProcessedTasksUseCase struct {
+        WebSocket WebSocketClient
+}
+
+func NewSendProcessedTasksUseCase(webSocket WebSocketClient) *SendProcessedTasksUseCase <span class="cov8" title="1">{
+        return &amp;SendProcessedTasksUseCase{
+                WebSocket: webSocket,
+        }
+}</span>
+
+type SendProcessedTasksInput struct {
+        Task entities.Task
+}
+
+type SendProcessedTasksOutput struct {
+}
+
+func (u *SendProcessedTasksUseCase) Execute(input *SendProcessedTasksInput) (*SendProcessedTasksOutput, error) <span class="cov8" title="1">{
+        if err := u.WebSocket.SendProcessedTasksToClient(input.Task); err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return &amp;SendProcessedTasksOutput{}, nil</span>
 }
 </pre>
 		

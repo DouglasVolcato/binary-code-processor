@@ -59,9 +59,11 @@
 				
 				<option value="file1">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/entities/event_entity.go (100.0%)</option>
 				
-				<option value="file2">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/entities/task_entity.go (100.0%)</option>
+				<option value="file2">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/usecases/process_unprocessed_events_usecase.go (100.0%)</option>
 				
-				<option value="file3">github.com/douglasvolcato/binary-code-processor/event_publisher/test/faker.go (0.0%)</option>
+				<option value="file3">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/usecases/send_processed_events_usecase.go (100.0%)</option>
+				
+				<option value="file4">github.com/douglasvolcato/binary-code-processor/event_publisher/test/faker.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -83,81 +85,112 @@ func main() {<span class="cov0" title="0">}</span>
 		<pre class="file" id="file1" style="display: none">package entities
 
 import (
+        "errors"
         "strings"
-
-        "github.com/stretchr/testify/assert"
 )
 
 type Event struct {
-        Task   Task
+        ID     string
         Status string
 }
 
-func NewEvent(task Task, status string) *Event <span class="cov8" title="1">{
+func NewEvent(id string, status string) *Event <span class="cov8" title="1">{
         return &amp;Event{
-                Task:   task,
+                ID:     id,
                 Status: status,
         }
 }</span>
 
 func (e *Event) Validate() error <span class="cov8" title="1">{
-        if strings.TrimSpace(e.Status) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+        if strings.TrimSpace(e.ID) == "" </span><span class="cov8" title="1">{
+                return errors.New("invalid event id")
         }</span>
-        <span class="cov8" title="1">if err := e.Task.Validate(); err != nil </span><span class="cov8" title="1">{
-                return err
+        <span class="cov8" title="1">if strings.TrimSpace(e.Status) == "" </span><span class="cov8" title="1">{
+                return errors.New("invalid event status")
         }</span>
         <span class="cov8" title="1">return nil</span>
 }
 </pre>
 		
-		<pre class="file" id="file2" style="display: none">package entities
+		<pre class="file" id="file2" style="display: none">package usecases
 
-import (
-        "strings"
-
-        "github.com/stretchr/testify/assert"
-)
-
-type Task struct {
-        ID         string
-        Message    string
-        BinaryCode string
-        CreatedAt  string
-        UpdatedAt  string
+type ProcessUnprocessedEventsUseCase struct {
+        Repo            EventRepositoryInterface
+        Processor       EventProcessorInterface
+        RemoteProcessor RemoteEventProcessorInterface
 }
 
-func NewTask(id string, message string, binaryCode string, createdAt string, updatedAt string) *Task <span class="cov8" title="1">{
-        return &amp;Task{
-                ID:         id,
-                Message:    message,
-                BinaryCode: binaryCode,
-                CreatedAt:  createdAt,
-                UpdatedAt:  updatedAt,
+func NewProcessUnprocessedEventsUseCase(repo EventRepositoryInterface, processor EventProcessorInterface, remoteProcessor RemoteEventProcessorInterface) *ProcessUnprocessedEventsUseCase <span class="cov8" title="1">{
+        return &amp;ProcessUnprocessedEventsUseCase{
+                Repo:            repo,
+                Processor:       processor,
+                RemoteProcessor: remoteProcessor,
         }
 }</span>
 
-func (t *Task) Validate() error <span class="cov8" title="1">{
-        if strings.TrimSpace(t.ID) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+type ProcessUnprocessedEventsInput struct {
+}
+
+type ProcessUnprocessedEventsOutput struct {
+}
+
+func (u *ProcessUnprocessedEventsUseCase) Execute(input *ProcessUnprocessedEventsInput) (*ProcessUnprocessedEventsOutput, error) <span class="cov8" title="1">{
+        events, err := u.Repo.GetUnprocessedEvents(100, 0)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
         }</span>
-        <span class="cov8" title="1">if strings.TrimSpace(t.Message) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
-        }</span>
-        <span class="cov8" title="1">if strings.TrimSpace(string(t.BinaryCode)) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
-        }</span>
-        <span class="cov8" title="1">if strings.TrimSpace(t.CreatedAt) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
-        }</span>
-        <span class="cov8" title="1">if strings.TrimSpace(t.UpdatedAt) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
-        }</span>
-        <span class="cov8" title="1">return nil</span>
+        <span class="cov8" title="1">for _, event := range events </span><span class="cov8" title="1">{
+                if err := u.RemoteProcessor.SendToQueue(event); err != nil </span><span class="cov8" title="1">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">if err := u.Processor.SendEventToProcess(event); err != nil </span><span class="cov8" title="1">{
+                        return nil, err
+                }</span>
+        }
+        <span class="cov8" title="1">return &amp;ProcessUnprocessedEventsOutput{}, nil</span>
 }
 </pre>
 		
-		<pre class="file" id="file3" style="display: none">package test
+		<pre class="file" id="file3" style="display: none">package usecases
+
+type SendProcessedEventsUseCase struct {
+        Repo            EventRepositoryInterface
+        Processor       EventProcessorInterface
+        RemoteProcessor RemoteEventProcessorInterface
+}
+
+func NewSendProcessedEventsUseCase(repo EventRepositoryInterface, processor EventProcessorInterface, remoteProcessor RemoteEventProcessorInterface) *SendProcessedEventsUseCase <span class="cov8" title="1">{
+        return &amp;SendProcessedEventsUseCase{
+                Repo:            repo,
+                Processor:       processor,
+                RemoteProcessor: remoteProcessor,
+        }
+}</span>
+
+type SendProcessedEventsInput struct {
+}
+
+type SendProcessedEventsOutput struct {
+}
+
+func (u *SendProcessedEventsUseCase) Execute(input *SendProcessedEventsInput) (*SendProcessedEventsOutput, error) <span class="cov8" title="1">{
+        events, err := u.Repo.GetUnprocessedEvents(100, 0)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">for _, event := range events </span><span class="cov8" title="1">{
+                if err := u.RemoteProcessor.SendFanoutEvent(event); err != nil </span><span class="cov8" title="1">{
+                        return nil, err
+                }</span>
+                <span class="cov8" title="1">if err := u.Processor.SendFanoutEvent(event); err != nil </span><span class="cov8" title="1">{
+                        return nil, err
+                }</span>
+        }
+        <span class="cov8" title="1">return &amp;SendProcessedEventsOutput{}, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package test
 
 import (
         "github.com/go-faker/faker/v4"

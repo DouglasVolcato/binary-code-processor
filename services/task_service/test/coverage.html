@@ -95,9 +95,8 @@ func main() {<span class="cov0" title="0">}</span>
 		<pre class="file" id="file1" style="display: none">package entities
 
 import (
+        "errors"
         "strings"
-
-        "github.com/stretchr/testify/assert"
 )
 
 type Event struct {
@@ -114,7 +113,7 @@ func NewEvent(task Task, status string) *Event <span class="cov8" title="1">{
 
 func (e *Event) Validate() error <span class="cov8" title="1">{
         if strings.TrimSpace(e.Status) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+                return errors.New("invalid event status")
         }</span>
         <span class="cov8" title="1">if err := e.Task.Validate(); err != nil </span><span class="cov8" title="1">{
                 return err
@@ -126,9 +125,8 @@ func (e *Event) Validate() error <span class="cov8" title="1">{
 		<pre class="file" id="file2" style="display: none">package entities
 
 import (
+        "errors"
         "strings"
-
-        "github.com/stretchr/testify/assert"
 )
 
 type Task struct {
@@ -151,19 +149,19 @@ func NewTask(id string, message string, binaryCode string, createdAt string, upd
 
 func (t *Task) Validate() error <span class="cov8" title="1">{
         if strings.TrimSpace(t.ID) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+                return errors.New("invalid task id")
         }</span>
         <span class="cov8" title="1">if strings.TrimSpace(t.Message) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+                return errors.New("invalid task message")
         }</span>
         <span class="cov8" title="1">if strings.TrimSpace(string(t.BinaryCode)) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+                return errors.New("invalid task binary code")
         }</span>
         <span class="cov8" title="1">if strings.TrimSpace(t.CreatedAt) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+                return errors.New("invalid task created at")
         }</span>
         <span class="cov8" title="1">if strings.TrimSpace(t.UpdatedAt) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
+                return errors.New("invalid task updated at")
         }</span>
         <span class="cov8" title="1">return nil</span>
 }
