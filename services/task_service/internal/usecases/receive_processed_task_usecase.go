@@ -11,8 +11,7 @@ func NewReceiveProcessedTaskUseCase(repo TaskProcessorInterface) *ReceiveProcess
 }
 
 type ReceiveProcessedTaskInput struct {
-	ID         string
-	BinaryCode string
+	ID string
 }
 
 type ReceiveProcessedTaskOutput struct {

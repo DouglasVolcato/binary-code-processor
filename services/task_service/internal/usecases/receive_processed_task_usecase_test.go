@@ -46,7 +46,7 @@ func TestReceiveProcessedTaskExecuteShouldReturnSuccess(t *testing.T) {
 		SetTaskAsProcessedFunc: func(taskID string) error { return nil },
 	}
 	sut := NewReceiveProcessedTaskUseCase(repo)
-	input := &ReceiveProcessedTaskInput{ID: faker.ID(), BinaryCode: faker.Phrase()}
+	input := &ReceiveProcessedTaskInput{ID: faker.ID()}
 	output, err := sut.Execute(input)
 
 	assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestReceiveProcessedTaskExecuteShouldReturnErrorWhenRepoFails(t *testing.T)
 	}
 	sut := NewReceiveProcessedTaskUseCase(repo)
 
-	input := &ReceiveProcessedTaskInput{ID: faker.ID(), BinaryCode: faker.Phrase()}
+	input := &ReceiveProcessedTaskInput{ID: faker.ID()}
 	output, err := sut.Execute(input)
 
 	assert.Nil(t, output)

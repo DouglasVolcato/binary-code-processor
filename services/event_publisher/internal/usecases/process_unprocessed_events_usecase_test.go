@@ -16,6 +16,13 @@ type mockEventRepositoryForProcessUnprocessed struct {
 		Offset int
 	}
 	GetUnprocessedEventsFunc func(limit int, offset int) ([]entities.Event, error)
+
+	GetProcessedEventsCalls int
+	GetProcessedEventsArgs  struct {
+		Limit  int
+		Offset int
+	}
+	GetProcessedEventsFunc func(limit int, offset int) ([]entities.Event, error)
 }
 
 func (m *mockEventRepositoryForProcessUnprocessed) GetUnprocessedEvents(limit int, offset int) ([]entities.Event, error) {
@@ -24,6 +31,16 @@ func (m *mockEventRepositoryForProcessUnprocessed) GetUnprocessedEvents(limit in
 	m.GetUnprocessedEventsArgs.Offset = offset
 	if m.GetUnprocessedEventsFunc != nil {
 		return m.GetUnprocessedEventsFunc(limit, offset)
+	}
+	return nil, nil
+}
+
+func (m *mockEventRepositoryForProcessUnprocessed) GetProcessedEvents(limit int, offset int) ([]entities.Event, error) {
+	m.GetProcessedEventsCalls++
+	m.GetProcessedEventsArgs.Limit = limit
+	m.GetProcessedEventsArgs.Offset = offset
+	if m.GetProcessedEventsFunc != nil {
+		return m.GetProcessedEventsFunc(limit, offset)
 	}
 	return nil, nil
 }
@@ -130,6 +147,7 @@ func TestProcessUnprocessedEventsExecuteShouldSendAllEventsToQueueAndProcess(t *
 	assert.Equal(t, 1, repo.GetUnprocessedEventsCalls)
 	assert.Equal(t, 100, repo.GetUnprocessedEventsArgs.Limit)
 	assert.Equal(t, 0, repo.GetUnprocessedEventsArgs.Offset)
+	assert.Equal(t, 0, repo.GetProcessedEventsCalls)
 	assert.Equal(t, 2, remoteProcessor.SendToQueueCalls)
 	assert.Equal(t, 2, processor.SendEventToProcessCalls)
 	assert.Equal(t, events[1], remoteProcessor.SendToQueueArgs.Event)
@@ -152,6 +170,7 @@ func TestProcessUnprocessedEventsExecuteShouldReturnErrorWhenRepoFails(t *testin
 	assert.Nil(t, output)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.Equal(t, 1, repo.GetUnprocessedEventsCalls)
+	assert.Equal(t, 0, repo.GetProcessedEventsCalls)
 	assert.Equal(t, 0, remoteProcessor.SendToQueueCalls)
 	assert.Equal(t, 0, processor.SendEventToProcessCalls)
 }
@@ -180,6 +199,7 @@ func TestProcessUnprocessedEventsExecuteShouldReturnErrorWhenRemoteProcessorFail
 	assert.Nil(t, output)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.Equal(t, 1, repo.GetUnprocessedEventsCalls)
+	assert.Equal(t, 0, repo.GetProcessedEventsCalls)
 	assert.Equal(t, 1, remoteProcessor.SendToQueueCalls)
 	assert.Equal(t, 0, processor.SendEventToProcessCalls)
 	assert.Equal(t, events[0], remoteProcessor.SendToQueueArgs.Event)
@@ -209,6 +229,7 @@ func TestProcessUnprocessedEventsExecuteShouldReturnErrorWhenProcessorFails(t *t
 	assert.Nil(t, output)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.Equal(t, 1, repo.GetUnprocessedEventsCalls)
+	assert.Equal(t, 0, repo.GetProcessedEventsCalls)
 	assert.Equal(t, 2, remoteProcessor.SendToQueueCalls)
 	assert.Equal(t, 2, processor.SendEventToProcessCalls)
 	assert.Equal(t, events[1], processor.SendEventToProcessArgs.Event)

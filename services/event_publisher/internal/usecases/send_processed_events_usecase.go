@@ -21,7 +21,7 @@ type SendProcessedEventsOutput struct {
 }
 
 func (u *SendProcessedEventsUseCase) Execute(input *SendProcessedEventsInput) (*SendProcessedEventsOutput, error) {
-	events, err := u.Repo.GetUnprocessedEvents(100, 0)
+	events, err := u.Repo.GetProcessedEvents(100, 0)
 	if err != nil {
 		return nil, err
 	}

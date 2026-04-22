@@ -16,6 +16,13 @@ type mockEventRepositoryForSendProcessed struct {
 		Offset int
 	}
 	GetUnprocessedEventsFunc func(limit int, offset int) ([]entities.Event, error)
+
+	GetProcessedEventsCalls int
+	GetProcessedEventsArgs  struct {
+		Limit  int
+		Offset int
+	}
+	GetProcessedEventsFunc func(limit int, offset int) ([]entities.Event, error)
 }
 
 func (m *mockEventRepositoryForSendProcessed) GetUnprocessedEvents(limit int, offset int) ([]entities.Event, error) {
@@ -24,6 +31,16 @@ func (m *mockEventRepositoryForSendProcessed) GetUnprocessedEvents(limit int, of
 	m.GetUnprocessedEventsArgs.Offset = offset
 	if m.GetUnprocessedEventsFunc != nil {
 		return m.GetUnprocessedEventsFunc(limit, offset)
+	}
+	return nil, nil
+}
+
+func (m *mockEventRepositoryForSendProcessed) GetProcessedEvents(limit int, offset int) ([]entities.Event, error) {
+	m.GetProcessedEventsCalls++
+	m.GetProcessedEventsArgs.Limit = limit
+	m.GetProcessedEventsArgs.Offset = offset
+	if m.GetProcessedEventsFunc != nil {
+		return m.GetProcessedEventsFunc(limit, offset)
 	}
 	return nil, nil
 }
@@ -115,7 +132,7 @@ func TestNewSendProcessedEventsUseCaseShouldCreateSendProcessedEventsUseCase(t *
 func TestSendProcessedEventsExecuteShouldSendAllEvents(t *testing.T) {
 	events := makeFakeSendProcessedEvents(2)
 	repo := &mockEventRepositoryForSendProcessed{
-		GetUnprocessedEventsFunc: func(limit int, offset int) ([]entities.Event, error) {
+		GetProcessedEventsFunc: func(limit int, offset int) ([]entities.Event, error) {
 			return events, nil
 		},
 	}
@@ -127,9 +144,10 @@ func TestSendProcessedEventsExecuteShouldSendAllEvents(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, output)
-	assert.Equal(t, 1, repo.GetUnprocessedEventsCalls)
-	assert.Equal(t, 100, repo.GetUnprocessedEventsArgs.Limit)
-	assert.Equal(t, 0, repo.GetUnprocessedEventsArgs.Offset)
+	assert.Equal(t, 1, repo.GetProcessedEventsCalls)
+	assert.Equal(t, 100, repo.GetProcessedEventsArgs.Limit)
+	assert.Equal(t, 0, repo.GetProcessedEventsArgs.Offset)
+	assert.Equal(t, 0, repo.GetUnprocessedEventsCalls)
 	assert.Equal(t, 2, remoteProcessor.SendFanoutEventCalls)
 	assert.Equal(t, 2, processor.SendFanoutEventCalls)
 	assert.Equal(t, events[1], remoteProcessor.SendFanoutEventArgs.Event)
@@ -139,7 +157,7 @@ func TestSendProcessedEventsExecuteShouldSendAllEvents(t *testing.T) {
 func TestSendProcessedEventsExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedErr := errors.New("repo failure")
 	repo := &mockEventRepositoryForSendProcessed{
-		GetUnprocessedEventsFunc: func(limit int, offset int) ([]entities.Event, error) {
+		GetProcessedEventsFunc: func(limit int, offset int) ([]entities.Event, error) {
 			return nil, expectedErr
 		},
 	}
@@ -151,7 +169,8 @@ func TestSendProcessedEventsExecuteShouldReturnErrorWhenRepoFails(t *testing.T) 
 
 	assert.Nil(t, output)
 	assert.ErrorIs(t, err, expectedErr)
-	assert.Equal(t, 1, repo.GetUnprocessedEventsCalls)
+	assert.Equal(t, 1, repo.GetProcessedEventsCalls)
+	assert.Equal(t, 0, repo.GetUnprocessedEventsCalls)
 	assert.Equal(t, 0, remoteProcessor.SendFanoutEventCalls)
 	assert.Equal(t, 0, processor.SendFanoutEventCalls)
 }
@@ -160,7 +179,7 @@ func TestSendProcessedEventsExecuteShouldReturnErrorWhenRemoteProcessorFails(t *
 	events := makeFakeSendProcessedEvents(2)
 	expectedErr := errors.New("remote failure")
 	repo := &mockEventRepositoryForSendProcessed{
-		GetUnprocessedEventsFunc: func(limit int, offset int) ([]entities.Event, error) {
+		GetProcessedEventsFunc: func(limit int, offset int) ([]entities.Event, error) {
 			return events, nil
 		},
 	}
@@ -179,7 +198,8 @@ func TestSendProcessedEventsExecuteShouldReturnErrorWhenRemoteProcessorFails(t *
 
 	assert.Nil(t, output)
 	assert.ErrorIs(t, err, expectedErr)
-	assert.Equal(t, 1, repo.GetUnprocessedEventsCalls)
+	assert.Equal(t, 1, repo.GetProcessedEventsCalls)
+	assert.Equal(t, 0, repo.GetUnprocessedEventsCalls)
 	assert.Equal(t, 1, remoteProcessor.SendFanoutEventCalls)
 	assert.Equal(t, 0, processor.SendFanoutEventCalls)
 	assert.Equal(t, events[0], remoteProcessor.SendFanoutEventArgs.Event)
@@ -189,7 +209,7 @@ func TestSendProcessedEventsExecuteShouldReturnErrorWhenProcessorFails(t *testin
 	events := makeFakeSendProcessedEvents(2)
 	expectedErr := errors.New("processor failure")
 	repo := &mockEventRepositoryForSendProcessed{
-		GetUnprocessedEventsFunc: func(limit int, offset int) ([]entities.Event, error) {
+		GetProcessedEventsFunc: func(limit int, offset int) ([]entities.Event, error) {
 			return events, nil
 		},
 	}
@@ -208,7 +228,8 @@ func TestSendProcessedEventsExecuteShouldReturnErrorWhenProcessorFails(t *testin
 
 	assert.Nil(t, output)
 	assert.ErrorIs(t, err, expectedErr)
-	assert.Equal(t, 1, repo.GetUnprocessedEventsCalls)
+	assert.Equal(t, 1, repo.GetProcessedEventsCalls)
+	assert.Equal(t, 0, repo.GetUnprocessedEventsCalls)
 	assert.Equal(t, 2, remoteProcessor.SendFanoutEventCalls)
 	assert.Equal(t, 2, processor.SendFanoutEventCalls)
 	assert.Equal(t, events[1], processor.SendFanoutEventArgs.Event)
