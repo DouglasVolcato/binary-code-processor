@@ -41,13 +41,13 @@ func makeFakeTask() entities.Task {
 
 func makeFakeTasks(count int) []entities.Task {
 	tasks := make([]entities.Task, 0, count)
-	for range count {
+	for i := 0; i < count; i++ {
 		tasks = append(tasks, makeFakeTask())
 	}
 	return tasks
 }
 
-func TestNewGetTasksUseCaseShouldReturnInstance(t *testing.T) {
+func TestNewGetTasksUseCaseShouldCreateGetTasksUseCase(t *testing.T) {
 	repo := &mockTaskRepository{}
 	sut := NewGetTasksUseCase(repo)
 
@@ -55,7 +55,7 @@ func TestNewGetTasksUseCaseShouldReturnInstance(t *testing.T) {
 	assert.Same(t, repo, sut.Repo)
 }
 
-func TestExecuteShouldCallRepoWithInputValues(t *testing.T) {
+func TestGetTasksExecuteShouldReturnTasks(t *testing.T) {
 	expectedTasks := makeFakeTasks(2)
 
 	repo := &mockTaskRepository{
@@ -80,7 +80,7 @@ func TestExecuteShouldCallRepoWithInputValues(t *testing.T) {
 	assert.Equal(t, 5, repo.GetTasksArgs.Offset)
 }
 
-func TestExecuteShouldUseDefaultLimitWhenInputLimitIsZero(t *testing.T) {
+func TestGetTasksExecuteShouldUseDefaultLimitWhenInputLimitIsZero(t *testing.T) {
 	expectedTasks := makeFakeTasks(1)
 
 	repo := &mockTaskRepository{
@@ -103,9 +103,10 @@ func TestExecuteShouldUseDefaultLimitWhenInputLimitIsZero(t *testing.T) {
 	assert.Equal(t, 1, repo.GetTasksCalls)
 	assert.Equal(t, 20, repo.GetTasksArgs.Limit)
 	assert.Equal(t, 3, repo.GetTasksArgs.Offset)
+	assert.Equal(t, 20, input.Limit)
 }
 
-func TestExecuteShouldUseDefaultLimitWhenInputLimitIsGreaterThanMaximum(t *testing.T) {
+func TestGetTasksExecuteShouldUseDefaultLimitWhenInputLimitIsGreaterThanMaximum(t *testing.T) {
 	expectedTasks := makeFakeTasks(1)
 
 	repo := &mockTaskRepository{
@@ -128,9 +129,10 @@ func TestExecuteShouldUseDefaultLimitWhenInputLimitIsGreaterThanMaximum(t *testi
 	assert.Equal(t, 1, repo.GetTasksCalls)
 	assert.Equal(t, 20, repo.GetTasksArgs.Limit)
 	assert.Equal(t, 7, repo.GetTasksArgs.Offset)
+	assert.Equal(t, 20, input.Limit)
 }
 
-func TestExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
+func TestGetTasksExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedError := errors.New("repo failure")
 	repo := &mockTaskRepository{
 		GetTasksFunc: func(limit int, offset int) ([]entities.Task, error) {

@@ -15,9 +15,11 @@ type mockRepoForGetByID struct {
 		TaskID string
 	}
 	GetTaskByIDFunc func(taskID string) (entities.Task, error)
+	GetTasksCalls   int
 }
 
 func (m *mockRepoForGetByID) GetTasks(limit int, offset int) ([]entities.Task, error) {
+	m.GetTasksCalls++
 	return nil, nil
 }
 
@@ -41,7 +43,7 @@ func makeFakeTask() entities.Task {
 	}
 }
 
-func TestNewGetTaskByIDUseCase_Constructs(t *testing.T) {
+func TestNewGetTaskByIDUseCaseShouldCreateGetTaskByIDUseCase(t *testing.T) {
 	repo := &mockRepoForGetByID{}
 	sut := NewGetTaskByIDUseCase(repo)
 
@@ -49,7 +51,7 @@ func TestNewGetTaskByIDUseCase_Constructs(t *testing.T) {
 	assert.Same(t, repo, sut.Repo)
 }
 
-func TestGetTaskByIDExecute_Success(t *testing.T) {
+func TestGetTaskByIDExecuteShouldReturnTask(t *testing.T) {
 	task := makeFakeTask()
 	repo := &mockRepoForGetByID{
 		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
@@ -66,9 +68,10 @@ func TestGetTaskByIDExecute_Success(t *testing.T) {
 	assert.Equal(t, task, output.Task)
 	assert.Equal(t, 1, repo.GetTaskByIDCalls)
 	assert.Equal(t, task.ID, repo.GetTaskByIDArgs.TaskID)
+	assert.Equal(t, 0, repo.GetTasksCalls)
 }
 
-func TestGetTaskByIDExecute_RepoError(t *testing.T) {
+func TestGetTaskByIDExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedErr := errors.New("not found")
 	repo := &mockRepoForGetByID{
 		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
@@ -83,4 +86,5 @@ func TestGetTaskByIDExecute_RepoError(t *testing.T) {
 	assert.Nil(t, output)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.Equal(t, 1, repo.GetTaskByIDCalls)
+	assert.Equal(t, 0, repo.GetTasksCalls)
 }

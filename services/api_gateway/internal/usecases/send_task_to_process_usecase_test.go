@@ -35,7 +35,18 @@ func makeFakeMessages(count int) []string {
 	return msgs
 }
 
-func TestNewSendTaskToProcessUseCaseShouldReturnInstance(t *testing.T) {
+func makeFakeTaskEntity() entities.Task {
+	faker := test.FakeData{}
+	return entities.Task{
+		ID:         faker.ID(),
+		Message:    faker.Phrase(),
+		BinaryCode: faker.Phrase(),
+		CreatedAt:  faker.Date(),
+		UpdatedAt:  faker.Date(),
+	}
+}
+
+func TestNewSendTaskToProcessUseCaseShouldCreateSendTaskToProcessUseCase(t *testing.T) {
 	repo := &mockTaskProcessor{}
 	sut := NewSendTaskToProcessUseCase(repo)
 
@@ -43,12 +54,16 @@ func TestNewSendTaskToProcessUseCaseShouldReturnInstance(t *testing.T) {
 	assert.Same(t, repo, sut.Repo)
 }
 
-func TestSendTaskExecuteShouldCallRepoWithInputValues(t *testing.T) {
+func TestSendTaskToProcessExecuteShouldReturnTasks(t *testing.T) {
 	expectedMessages := makeFakeMessages(3)
+	expectedTasks := []entities.Task{
+		makeFakeTaskEntity(),
+		makeFakeTaskEntity(),
+	}
 
 	repo := &mockTaskProcessor{
 		SendTaskToProcessFunc: func(messages []string) ([]entities.Task, error) {
-			return nil, nil
+			return expectedTasks, nil
 		},
 	}
 	sut := NewSendTaskToProcessUseCase(repo)
@@ -62,11 +77,12 @@ func TestSendTaskExecuteShouldCallRepoWithInputValues(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, output)
 	assert.True(t, output.Success)
+	assert.Equal(t, expectedTasks, output.Tasks)
 	assert.Equal(t, 1, repo.SendTaskToProcessCalls)
 	assert.Equal(t, expectedMessages, repo.SendTaskToProcessArgs.Messages)
 }
 
-func TestSendTaskExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
+func TestSendTaskToProcessExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedError := errors.New("repo failure")
 	repo := &mockTaskProcessor{
 		SendTaskToProcessFunc: func(messages []string) ([]entities.Task, error) {

@@ -57,7 +57,7 @@ func makeFakeTasks(count int) []entities.Task {
 	return tasks
 }
 
-func TestNewGetTasksUseCaseShouldReturnInstance_TaskService(t *testing.T) {
+func TestNewGetTasksUseCaseShouldCreateGetTasksUseCase(t *testing.T) {
 	repo := &mockTaskRepository{}
 	sut := NewGetTasksUseCase(repo)
 
@@ -65,7 +65,7 @@ func TestNewGetTasksUseCaseShouldReturnInstance_TaskService(t *testing.T) {
 	assert.Same(t, repo, sut.Repo)
 }
 
-func TestGetTasksExecuteShouldCallRepoWithInputValues_TaskService(t *testing.T) {
+func TestGetTasksExecuteShouldReturnTasks(t *testing.T) {
 	expectedTasks := makeFakeTasks(2)
 
 	repo := &mockTaskRepository{
@@ -88,9 +88,10 @@ func TestGetTasksExecuteShouldCallRepoWithInputValues_TaskService(t *testing.T) 
 	assert.Equal(t, 1, repo.GetTasksCalls)
 	assert.Equal(t, 10, repo.GetTasksArgs.Limit)
 	assert.Equal(t, 5, repo.GetTasksArgs.Offset)
+	assert.Equal(t, 0, repo.GetTaskByIDCalls)
 }
 
-func TestGetTasksExecuteShouldReturnErrorWhenRepoFails_TaskService(t *testing.T) {
+func TestGetTasksExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedError := errors.New("repo failure")
 	repo := &mockTaskRepository{
 		GetTasksFunc: func(limit int, offset int) ([]entities.Task, error) {
@@ -111,4 +112,5 @@ func TestGetTasksExecuteShouldReturnErrorWhenRepoFails_TaskService(t *testing.T)
 	assert.Equal(t, 1, repo.GetTasksCalls)
 	assert.Equal(t, 5, repo.GetTasksArgs.Limit)
 	assert.Equal(t, 1, repo.GetTasksArgs.Offset)
+	assert.Equal(t, 0, repo.GetTaskByIDCalls)
 }

@@ -43,18 +43,18 @@ func (m *mockProcessor) FinishProcessing(dto FinishProcessingDTO) error {
 	return nil
 }
 
-func makeFakeTask() entities.Task {
+func makeFakeTask(message string) entities.Task {
 	faker := test.FakeData{}
 	return entities.Task{
 		ID:         faker.ID(),
-		Message:    "A",
+		Message:    message,
 		BinaryCode: faker.Phrase(),
 		CreatedAt:  faker.Date(),
 		UpdatedAt:  faker.Date(),
 	}
 }
 
-func TestNewProcessTaskUseCase_ShouldConstruct(t *testing.T) {
+func TestNewProcessTaskUseCaseShouldCreateProcessTaskUseCase(t *testing.T) {
 	repo := &mockRepo{}
 	proc := &mockProcessor{}
 	sut := NewProcessTaskUseCase(repo, proc)
@@ -64,9 +64,8 @@ func TestNewProcessTaskUseCase_ShouldConstruct(t *testing.T) {
 	assert.Same(t, proc, sut.Processor)
 }
 
-func TestExecute_ShouldReturnOutputOnSuccess(t *testing.T) {
-	task := makeFakeTask()
-	task.Message = "A" // ASCII 65 -> 01000001
+func TestProcessTaskExecuteShouldReturnBinaryCode(t *testing.T) {
+	task := makeFakeTask("AB")
 
 	repo := &mockRepo{
 		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
@@ -87,15 +86,15 @@ func TestExecute_ShouldReturnOutputOnSuccess(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, out)
 	assert.Equal(t, "task-123", out.ID)
-	assert.Equal(t, "01000001", out.BinaryCode)
+	assert.Equal(t, "0100000101000010", out.BinaryCode)
 	assert.Equal(t, 1, repo.GetTaskByIDCalls)
 	assert.Equal(t, "task-123", repo.GetTaskByIDArgs.ID)
 	assert.Equal(t, 1, proc.FinishProcessingCalls)
 	assert.Equal(t, "task-123", proc.FinishProcessingArgs.DTO.ID)
-	assert.Equal(t, "01000001", proc.FinishProcessingArgs.DTO.BinaryCode)
+	assert.Equal(t, "0100000101000010", proc.FinishProcessingArgs.DTO.BinaryCode)
 }
 
-func TestExecute_ShouldReturnErrorWhenGetTaskFails(t *testing.T) {
+func TestProcessTaskExecuteShouldReturnErrorWhenGetTaskFails(t *testing.T) {
 	expectedErr := errors.New("not found")
 	repo := &mockRepo{
 		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
@@ -114,9 +113,30 @@ func TestExecute_ShouldReturnErrorWhenGetTaskFails(t *testing.T) {
 	assert.Equal(t, 0, proc.FinishProcessingCalls)
 }
 
-func TestExecute_ShouldReturnErrorWhenFinishProcessingFails(t *testing.T) {
-	task := makeFakeTask()
-	task.Message = "A"
+func TestProcessTaskExecuteShouldReturnErrorWhenTaskMessageIsEmpty(t *testing.T) {
+	task := makeFakeTask("")
+
+	repo := &mockRepo{
+		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
+			task.ID = taskID
+			return task, nil
+		},
+	}
+	proc := &mockProcessor{}
+
+	sut := NewProcessTaskUseCase(repo, proc)
+	input := &ProcessTaskInput{ID: "task-empty"}
+	out, err := sut.Execute(input)
+
+	assert.Nil(t, out)
+	assert.Error(t, err)
+	assert.Equal(t, 1, repo.GetTaskByIDCalls)
+	assert.Equal(t, "task-empty", repo.GetTaskByIDArgs.ID)
+	assert.Equal(t, 0, proc.FinishProcessingCalls)
+}
+
+func TestProcessTaskExecuteShouldReturnErrorWhenFinishProcessingFails(t *testing.T) {
+	task := makeFakeTask("AB")
 
 	expectedErr := errors.New("finish failure")
 	repo := &mockRepo{

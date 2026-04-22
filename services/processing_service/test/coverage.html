@@ -63,7 +63,7 @@
 				
 				<option value="file3">github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task_grpc.pb.go (0.0%)</option>
 				
-				<option value="file4">github.com/douglasvolcato/binary-code-processor/processing_service/internal/usecases/process_task_usecase.go (93.3%)</option>
+				<option value="file4">github.com/douglasvolcato/binary-code-processor/processing_service/internal/usecases/process_task_usecase.go (100.0%)</option>
 				
 				<option value="file5">github.com/douglasvolcato/binary-code-processor/processing_service/test/faker.go (0.0%)</option>
 				
@@ -425,6 +425,7 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		<pre class="file" id="file4" style="display: none">package usecases
 
 import (
+        "errors"
         "fmt"
         "strings"
 )
@@ -456,7 +457,7 @@ func (u *ProcessTaskUseCase) Execute(input *ProcessTaskInput) (*ProcessTaskOutpu
                 return nil, err
         }</span>
         <span class="cov8" title="1">binaryCode, err := u.convertMessageToBinaryCode(task.Message)
-        if err != nil </span><span class="cov0" title="0">{
+        if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
         <span class="cov8" title="1">err = u.Processor.FinishProcessing(FinishProcessingDTO{
@@ -473,7 +474,10 @@ func (u *ProcessTaskUseCase) Execute(input *ProcessTaskInput) (*ProcessTaskOutpu
 }
 
 func (u *ProcessTaskUseCase) convertMessageToBinaryCode(message string) (string, error) <span class="cov8" title="1">{
-        result := make([]string, len(message))
+        if strings.TrimSpace(message) == "" </span><span class="cov8" title="1">{
+                return "", errors.New("message is empty")
+        }</span>
+        <span class="cov8" title="1">result := make([]string, len(message))
 
         for i, char := range message </span><span class="cov8" title="1">{
                 result[i] = fmt.Sprintf("%08b", char)

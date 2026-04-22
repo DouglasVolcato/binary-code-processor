@@ -12,15 +12,11 @@ type testDataEventEntity struct {
 	Status string
 }
 
-func makeFakeDataEventEntity(invalidTask bool) *testDataEventEntity {
+func makeFakeDataEventEntity() *testDataEventEntity {
 	faker := test.FakeData{}
-	id := faker.ID()
-	if invalidTask {
-		id = ""
-	}
 	return &testDataEventEntity{
 		Task: Task{
-			ID:         id,
+			ID:         faker.ID(),
 			Message:    faker.Phrase(),
 			BinaryCode: faker.Phrase(),
 			CreatedAt:  faker.Date(),
@@ -31,8 +27,9 @@ func makeFakeDataEventEntity(invalidTask bool) *testDataEventEntity {
 }
 
 func TestNewEventShouldCreateEvent(t *testing.T) {
-	testData := makeFakeDataEventEntity(false)
+	testData := makeFakeDataEventEntity()
 	sut := NewEvent(testData.Task, testData.Status)
+
 	assert.NotNil(t, sut)
 	assert.Equal(t, testData.Task.ID, sut.Task.ID)
 	assert.Equal(t, testData.Task.Message, sut.Task.Message)
@@ -43,15 +40,24 @@ func TestNewEventShouldCreateEvent(t *testing.T) {
 }
 
 func TestValidateShouldReturnErrorIfEventDataIsInvalid(t *testing.T) {
-	testData := makeFakeDataEventEntity(true)
-	err := NewEvent(testData.Task, testData.Status).Validate()
-	assert.Error(t, err)
-	err = NewEvent(testData.Task, "").Validate()
-	assert.Error(t, err)
+	testData := makeFakeDataEventEntity()
+	tests := []struct {
+		name  string
+		event *Event
+	}{
+		{name: "invalid task", event: NewEvent(Task{}, testData.Status)},
+		{name: "empty status", event: NewEvent(testData.Task, "")},
+		{name: "blank status", event: NewEvent(testData.Task, " ")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Error(t, tt.event.Validate())
+		})
+	}
 }
 
 func TestValidateShouldReturnNilIfEventDataIsValid(t *testing.T) {
-	testData := makeFakeDataEventEntity(false)
-	err := NewEvent(testData.Task, testData.Status).Validate()
-	assert.NoError(t, err)
+	testData := makeFakeDataEventEntity()
+	assert.NoError(t, NewEvent(testData.Task, testData.Status).Validate())
 }

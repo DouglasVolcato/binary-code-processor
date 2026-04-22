@@ -1,5 +1,4 @@
 mode: set
-github.com/douglasvolcato/binary-code-processor/api_gateway/cmd/main.go:3.14,3.15 0 0
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:17.102,25.2 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:27.33,28.35 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:28.35,30.3 1 1
@@ -22,6 +21,12 @@ github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/se
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/send_task_to_process_usecase.go:24.109,26.16 2 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/send_task_to_process_usecase.go:26.16,28.3 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/send_task_to_process_usecase.go:29.2,32.8 1 1
+github.com/douglasvolcato/binary-code-processor/api_gateway/cmd/main.go:3.14,3.15 0 0
+github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:9.32,11.2 1 0
+github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:13.34,15.2 1 0
+github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:17.36,19.2 1 0
+github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:21.36,23.2 1 0
+github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:25.34,27.2 1 0
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task.pb.go:31.47,36.2 4 0
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task.pb.go:38.55,40.2 1 0
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task.pb.go:42.53,42.54 0 0
@@ -102,8 +107,3 @@ github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task_grpc.pb.go:123.2,127.77 2 0
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task_grpc.pb.go:127.77,129.3 1 0
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task_grpc.pb.go:130.2,130.44 1 0
-github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:9.32,11.2 1 0
-github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:13.34,15.2 1 0
-github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:17.36,19.2 1 0
-github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:21.36,23.2 1 0
-github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go:25.34,27.2 1 0

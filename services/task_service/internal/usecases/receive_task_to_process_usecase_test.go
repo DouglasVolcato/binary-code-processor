@@ -16,8 +16,8 @@ type mockProcessorForReceive struct {
 	}
 	MoveTaskToProcessingFunc func(dto CreateTaskDTO) (entities.Task, error)
 
-	// implement SetTaskAsProcessed so it satisfies TaskProcessorInterface if needed elsewhere
-	SetTaskAsProcessedFunc func(taskID string) error
+	SetTaskAsProcessedCalls int
+	SetTaskAsProcessedFunc  func(taskID string) error
 }
 
 func (m *mockProcessorForReceive) MoveTaskToProcessing(dto CreateTaskDTO) (entities.Task, error) {
@@ -30,6 +30,7 @@ func (m *mockProcessorForReceive) MoveTaskToProcessing(dto CreateTaskDTO) (entit
 }
 
 func (m *mockProcessorForReceive) SetTaskAsProcessed(taskID string) error {
+	m.SetTaskAsProcessedCalls++
 	if m.SetTaskAsProcessedFunc != nil {
 		return m.SetTaskAsProcessedFunc(taskID)
 	}
@@ -60,7 +61,7 @@ func makeFakeTaskEntity() entities.Task {
 	}
 }
 
-func TestNewReceiveTaskToProcessUseCase_ConstructsWithDeps(t *testing.T) {
+func TestNewReceiveTaskToProcessUseCaseShouldCreateReceiveTaskToProcessUseCase(t *testing.T) {
 	proc := &mockProcessorForReceive{}
 	idGen := &mockIDGen{}
 	sut := NewReceiveTaskToProcessUseCase(proc, idGen)
@@ -70,50 +71,57 @@ func TestNewReceiveTaskToProcessUseCase_ConstructsWithDeps(t *testing.T) {
 	assert.Same(t, idGen, sut.IDGen)
 }
 
-func TestReceiveTaskToProcessExecute_Success(t *testing.T) {
+func TestReceiveTaskToProcessExecuteShouldReturnTask(t *testing.T) {
+	faker := test.FakeData{}
 	fakeTask := makeFakeTaskEntity()
-	id := "generated-id-123"
+	input := &ReceiveTaskToProcessInput{Message: faker.Phrase()}
 
 	proc := &mockProcessorForReceive{
 		MoveTaskToProcessingFunc: func(dto CreateTaskDTO) (entities.Task, error) {
-			// return a task with the dto values
-			t := fakeTask
-			t.ID = dto.ID
-			t.Message = dto.Message
-			return t, nil
+			task := fakeTask
+			task.ID = dto.ID
+			task.Message = dto.Message
+			return task, nil
 		},
 	}
-	idGen := &mockIDGen{GenerateIDFunc: func() string { return id }}
+	idGen := &mockIDGen{GenerateIDFunc: func() string { return fakeTask.ID }}
 
 	sut := NewReceiveTaskToProcessUseCase(proc, idGen)
 
-	input := &ReceiveTaskToProcessInput{Message: "hello"}
 	output, err := sut.Execute(input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, output)
 	assert.True(t, output.Success)
-	assert.Equal(t, id, output.Task.ID)
-	assert.Equal(t, "hello", output.Task.Message)
+	assert.Equal(t, fakeTask.ID, output.Task.ID)
+	assert.Equal(t, input.Message, output.Task.Message)
 	assert.Equal(t, 1, proc.MoveTaskToProcessingCalls)
+	assert.Equal(t, fakeTask.ID, proc.MoveTaskToProcessingArgs.DTO.ID)
+	assert.Equal(t, input.Message, proc.MoveTaskToProcessingArgs.DTO.Message)
 	assert.Equal(t, 1, idGen.GenerateIDCalls)
+	assert.Equal(t, 0, proc.SetTaskAsProcessedCalls)
 }
 
-func TestReceiveTaskToProcessExecute_RepoError(t *testing.T) {
+func TestReceiveTaskToProcessExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
+	faker := test.FakeData{}
 	expectedErr := errors.New("move failure")
 	proc := &mockProcessorForReceive{
 		MoveTaskToProcessingFunc: func(dto CreateTaskDTO) (entities.Task, error) {
 			return entities.Task{}, expectedErr
 		},
 	}
-	idGen := &mockIDGen{GenerateIDFunc: func() string { return "id" }}
+	idGen := &mockIDGen{GenerateIDFunc: func() string { return faker.ID() }}
 
 	sut := NewReceiveTaskToProcessUseCase(proc, idGen)
-	input := &ReceiveTaskToProcessInput{Message: "msg"}
+	input := &ReceiveTaskToProcessInput{Message: faker.Phrase()}
 
 	output, err := sut.Execute(input)
 
 	assert.Nil(t, output)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.Equal(t, 1, proc.MoveTaskToProcessingCalls)
+	assert.Equal(t, input.Message, proc.MoveTaskToProcessingArgs.DTO.Message)
+	assert.NotEmpty(t, proc.MoveTaskToProcessingArgs.DTO.ID)
+	assert.Equal(t, 1, idGen.GenerateIDCalls)
+	assert.Equal(t, 0, proc.SetTaskAsProcessedCalls)
 }

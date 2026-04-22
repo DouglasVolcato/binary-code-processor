@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 )
@@ -49,6 +50,9 @@ func (u *ProcessTaskUseCase) Execute(input *ProcessTaskInput) (*ProcessTaskOutpu
 }
 
 func (u *ProcessTaskUseCase) convertMessageToBinaryCode(message string) (string, error) {
+	if strings.TrimSpace(message) == "" {
+		return "", errors.New("message is empty")
+	}
 	result := make([]string, len(message))
 
 	for i, char := range message {
