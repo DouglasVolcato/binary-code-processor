@@ -1,29 +1,28 @@
 package entities
 
 import (
+	"errors"
 	"strings"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type Event struct {
-	Task   Task
+	ID     string
 	Status string
 }
 
-func NewEvent(task Task, status string) *Event {
+func NewEvent(id string, status string) *Event {
 	return &Event{
-		Task:   task,
+		ID:     id,
 		Status: status,
 	}
 }
 
 func (e *Event) Validate() error {
-	if strings.TrimSpace(e.Status) == "" {
-		return assert.AnError
+	if strings.TrimSpace(e.ID) == "" {
+		return errors.New("invalid event ID")
 	}
-	if err := e.Task.Validate(); err != nil {
-		return err
+	if strings.TrimSpace(e.Status) == "" {
+		return errors.New("invalid event status")
 	}
 	return nil
 }
