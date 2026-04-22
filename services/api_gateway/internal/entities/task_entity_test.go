@@ -54,8 +54,6 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 		{name: "blank id", task: NewTask(" ", testData.Message, testData.BinaryCode, testData.CreatedAt, testData.UpdatedAt)},
 		{name: "empty message", task: NewTask(testData.ID, "", testData.BinaryCode, testData.CreatedAt, testData.UpdatedAt)},
 		{name: "blank message", task: NewTask(testData.ID, " ", testData.BinaryCode, testData.CreatedAt, testData.UpdatedAt)},
-		{name: "empty binary code", task: NewTask(testData.ID, testData.Message, "", testData.CreatedAt, testData.UpdatedAt)},
-		{name: "blank binary code", task: NewTask(testData.ID, testData.Message, " ", testData.CreatedAt, testData.UpdatedAt)},
 		{name: "empty created at", task: NewTask(testData.ID, testData.Message, testData.BinaryCode, "", testData.UpdatedAt)},
 		{name: "blank created at", task: NewTask(testData.ID, testData.Message, testData.BinaryCode, " ", testData.UpdatedAt)},
 		{name: "empty updated at", task: NewTask(testData.ID, testData.Message, testData.BinaryCode, testData.CreatedAt, "")},
@@ -75,6 +73,13 @@ func TestValidateShouldReturnNilIfTaskDataIsValid(t *testing.T) {
 		testData.ID,
 		testData.Message,
 		testData.BinaryCode,
+		testData.CreatedAt,
+		testData.UpdatedAt,
+	).Validate())
+	assert.NoError(t, NewTask(
+		testData.ID,
+		testData.Message,
+		"",
 		testData.CreatedAt,
 		testData.UpdatedAt,
 	).Validate())

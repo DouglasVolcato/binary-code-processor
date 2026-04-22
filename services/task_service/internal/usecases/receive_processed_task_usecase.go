@@ -1,12 +1,14 @@
 package usecases
 
 type ReceiveProcessedTaskUseCase struct {
-	Repo TaskProcessorInterface
+	Repo   TaskProcessorInterface
+	Outbox TaskOutboxRepositoryInterface
 }
 
-func NewReceiveProcessedTaskUseCase(repo TaskProcessorInterface) *ReceiveProcessedTaskUseCase {
+func NewReceiveProcessedTaskUseCase(repo TaskProcessorInterface, outbox TaskOutboxRepositoryInterface) *ReceiveProcessedTaskUseCase {
 	return &ReceiveProcessedTaskUseCase{
-		Repo: repo,
+		Repo:   repo,
+		Outbox: outbox,
 	}
 }
 
@@ -19,8 +21,11 @@ type ReceiveProcessedTaskOutput struct {
 }
 
 func (u *ReceiveProcessedTaskUseCase) Execute(input *ReceiveProcessedTaskInput) (*ReceiveProcessedTaskOutput, error) {
-	err := u.Repo.SetTaskAsProcessed(input.ID)
+	task, err := u.Repo.SetTaskAsProcessed(input.ID)
 	if err != nil {
+		return nil, err
+	}
+	if err := u.Outbox.StoreProcessedEvent(task); err != nil {
 		return nil, err
 	}
 	return &ReceiveProcessedTaskOutput{

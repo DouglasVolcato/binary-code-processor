@@ -30,9 +30,6 @@ func (t *Task) Validate() error {
 	if strings.TrimSpace(t.Message) == "" {
 		return errors.New("invalid task message")
 	}
-	if strings.TrimSpace(string(t.BinaryCode)) == "" {
-		return errors.New("invalid task binary code")
-	}
 	if strings.TrimSpace(t.CreatedAt) == "" {
 		return errors.New("invalid task created at")
 	}
