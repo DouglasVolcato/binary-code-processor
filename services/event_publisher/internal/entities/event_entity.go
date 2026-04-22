@@ -19,7 +19,7 @@ func NewEvent(id string, status string) *Event {
 
 func (e *Event) Validate() error {
 	if strings.TrimSpace(e.ID) == "" {
-		return errors.New("invalid event ID")
+		return errors.New("invalid event id")
 	}
 	if strings.TrimSpace(e.Status) == "" {
 		return errors.New("invalid event status")

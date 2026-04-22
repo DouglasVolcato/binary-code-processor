@@ -1,9 +1,8 @@
 package entities
 
 import (
+	"errors"
 	"strings"
-
-	"github.com/stretchr/testify/assert"
 )
 
 type Task struct {
@@ -26,19 +25,19 @@ func NewTask(id string, message string, binaryCode string, createdAt string, upd
 
 func (t *Task) Validate() error {
 	if strings.TrimSpace(t.ID) == "" {
-		return assert.AnError
+		return errors.New("invalid task id")
 	}
 	if strings.TrimSpace(t.Message) == "" {
-		return assert.AnError
+		return errors.New("invalid task message")
 	}
 	if strings.TrimSpace(string(t.BinaryCode)) == "" {
-		return assert.AnError
+		return errors.New("invalid task binary code")
 	}
 	if strings.TrimSpace(t.CreatedAt) == "" {
-		return assert.AnError
+		return errors.New("invalid task created at")
 	}
 	if strings.TrimSpace(t.UpdatedAt) == "" {
-		return assert.AnError
+		return errors.New("invalid task updated at")
 	}
 	return nil
 }

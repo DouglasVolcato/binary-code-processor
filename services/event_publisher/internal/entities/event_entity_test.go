@@ -39,12 +39,12 @@ func TestValidateShouldReturnErrorIfEventDataIsInvalid(t *testing.T) {
 		{
 			name:  "empty id",
 			event: NewEvent("", testData.Status),
-			err:   "invalid event ID",
+			err:   "invalid event id",
 		},
 		{
 			name:  "blank id",
 			event: NewEvent(" ", testData.Status),
-			err:   "invalid event ID",
+			err:   "invalid event id",
 		},
 		{
 			name:  "empty status",
