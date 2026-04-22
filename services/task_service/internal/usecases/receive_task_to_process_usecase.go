@@ -3,17 +3,19 @@ package usecases
 import "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
 
 type ReceiveTaskToProcessUseCase struct {
-	Repo TaskProcessorInterface
+	Repo  TaskProcessorInterface
+	IDGen IDGeneratorInterface
 }
 
-func NewReceiveTaskToProcessUseCase(repo TaskProcessorInterface) *ReceiveTaskToProcessUseCase {
+func NewReceiveTaskToProcessUseCase(repo TaskProcessorInterface, idGen IDGeneratorInterface) *ReceiveTaskToProcessUseCase {
 	return &ReceiveTaskToProcessUseCase{
-		Repo: repo,
+		Repo:  repo,
+		IDGen: idGen,
 	}
 }
 
 type ReceiveTaskToProcessInput struct {
-	Task entities.Task
+	Message string
 }
 
 type ReceiveTaskToProcessOutput struct {
@@ -22,7 +24,11 @@ type ReceiveTaskToProcessOutput struct {
 }
 
 func (u *ReceiveTaskToProcessUseCase) Execute(input *ReceiveTaskToProcessInput) (*ReceiveTaskToProcessOutput, error) {
-	task, err := u.Repo.ProcessTask(input.Task)
+	createTaskDto := CreateTaskDTO{
+		ID:      u.IDGen.GenerateID(),
+		Message: input.Message,
+	}
+	task, err := u.Repo.MoveTaskToProcessing(createTaskDto)
 	if err != nil {
 		return nil, err
 	}

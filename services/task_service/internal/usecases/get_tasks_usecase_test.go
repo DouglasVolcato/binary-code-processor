@@ -15,7 +15,12 @@ type mockTaskRepository struct {
 		Limit  int
 		Offset int
 	}
-	GetTasksFunc func(limit int, offset int) ([]entities.Task, error)
+	GetTasksFunc     func(limit int, offset int) ([]entities.Task, error)
+	GetTaskByIDCalls int
+	GetTaskByIDArgs  struct {
+		TaskID string
+	}
+	GetTaskByIDFunc func(taskID string) (entities.Task, error)
 }
 
 func (m *mockTaskRepository) GetTasks(limit int, offset int) ([]entities.Task, error) {
@@ -26,6 +31,15 @@ func (m *mockTaskRepository) GetTasks(limit int, offset int) ([]entities.Task, e
 		return m.GetTasksFunc(limit, offset)
 	}
 	return nil, nil
+}
+
+func (m *mockTaskRepository) GetTaskByID(taskID string) (entities.Task, error) {
+	m.GetTaskByIDCalls++
+	m.GetTaskByIDArgs.TaskID = taskID
+	if m.GetTaskByIDFunc != nil {
+		return m.GetTaskByIDFunc(taskID)
+	}
+	return entities.Task{}, nil
 }
 
 func makeFakeTasks(count int) []entities.Task {
