@@ -5,13 +5,11 @@ github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/ta
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:27.35,29.3 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:30.2,30.40 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:30.40,32.3 1 1
-github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:33.2,33.51 1 1
-github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:33.51,35.3 1 1
+github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:33.2,33.42 1 1
+github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:33.42,35.3 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:36.2,36.42 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:36.42,38.3 1 1
-github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:39.2,39.42 1 1
-github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:39.42,41.3 1 1
-github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:42.2,42.12 1 1
+github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go:39.2,39.12 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/get_tasks_usecase.go:9.72,13.2 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/get_tasks_usecase.go:24.82,25.42 1 1
 github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/get_tasks_usecase.go:25.42,27.3 1 1

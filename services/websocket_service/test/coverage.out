@@ -1,5 +1,4 @@
 mode: set
-github.com/douglasvolcato/binary-code-processor/websocket_service/cmd/main.go:3.14,3.15 0 0
 github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/task_entity.go:13.50,18.2 1 1
 github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/task_entity.go:20.33,21.35 1 1
 github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/task_entity.go:21.35,23.3 1 1
@@ -10,6 +9,7 @@ github.com/douglasvolcato/binary-code-processor/websocket_service/internal/useca
 github.com/douglasvolcato/binary-code-processor/websocket_service/internal/usecases/send_processed_tasks_usecase.go:22.112,23.75 1 1
 github.com/douglasvolcato/binary-code-processor/websocket_service/internal/usecases/send_processed_tasks_usecase.go:23.75,25.3 1 1
 github.com/douglasvolcato/binary-code-processor/websocket_service/internal/usecases/send_processed_tasks_usecase.go:26.2,26.41 1 1
+github.com/douglasvolcato/binary-code-processor/websocket_service/cmd/main.go:3.14,3.15 0 0
 github.com/douglasvolcato/binary-code-processor/websocket_service/test/faker.go:9.32,11.2 1 0
 github.com/douglasvolcato/binary-code-processor/websocket_service/test/faker.go:13.34,15.2 1 0
 github.com/douglasvolcato/binary-code-processor/websocket_service/test/faker.go:17.36,19.2 1 0

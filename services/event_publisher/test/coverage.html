@@ -174,7 +174,7 @@ type SendProcessedEventsOutput struct {
 }
 
 func (u *SendProcessedEventsUseCase) Execute(input *SendProcessedEventsInput) (*SendProcessedEventsOutput, error) <span class="cov8" title="1">{
-        events, err := u.Repo.GetUnprocessedEvents(100, 0)
+        events, err := u.Repo.GetProcessedEvents(100, 0)
         if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
