@@ -8,34 +8,24 @@ import (
 )
 
 type testDataEventEntity struct {
-	Task   Task
+	ID     string
 	Status string
 }
 
 func makeFakeDataEventEntity() *testDataEventEntity {
 	faker := test.FakeData{}
 	return &testDataEventEntity{
-		Task: Task{
-			ID:         faker.ID(),
-			Message:    faker.Phrase(),
-			BinaryCode: faker.Phrase(),
-			CreatedAt:  faker.Date(),
-			UpdatedAt:  faker.Date(),
-		},
+		ID:     faker.ID(),
 		Status: faker.Word(),
 	}
 }
 
 func TestNewEventShouldCreateEvent(t *testing.T) {
 	testData := makeFakeDataEventEntity()
-	sut := NewEvent(testData.Task, testData.Status)
+	sut := NewEvent(testData.ID, testData.Status)
 
 	assert.NotNil(t, sut)
-	assert.Equal(t, testData.Task.ID, sut.Task.ID)
-	assert.Equal(t, testData.Task.Message, sut.Task.Message)
-	assert.Equal(t, testData.Task.BinaryCode, sut.Task.BinaryCode)
-	assert.Equal(t, testData.Task.CreatedAt, sut.Task.CreatedAt)
-	assert.Equal(t, testData.Task.UpdatedAt, sut.Task.UpdatedAt)
+	assert.Equal(t, testData.ID, sut.ID)
 	assert.Equal(t, testData.Status, sut.Status)
 }
 
@@ -44,20 +34,38 @@ func TestValidateShouldReturnErrorIfEventDataIsInvalid(t *testing.T) {
 	tests := []struct {
 		name  string
 		event *Event
+		err   string
 	}{
-		{name: "invalid task", event: NewEvent(Task{}, testData.Status)},
-		{name: "empty status", event: NewEvent(testData.Task, "")},
-		{name: "blank status", event: NewEvent(testData.Task, " ")},
+		{
+			name:  "empty id",
+			event: NewEvent("", testData.Status),
+			err:   "invalid event ID",
+		},
+		{
+			name:  "blank id",
+			event: NewEvent(" ", testData.Status),
+			err:   "invalid event ID",
+		},
+		{
+			name:  "empty status",
+			event: NewEvent(testData.ID, ""),
+			err:   "invalid event status",
+		},
+		{
+			name:  "blank status",
+			event: NewEvent(testData.ID, " "),
+			err:   "invalid event status",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Error(t, tt.event.Validate())
+			assert.EqualError(t, tt.event.Validate(), tt.err)
 		})
 	}
 }
 
 func TestValidateShouldReturnNilIfEventDataIsValid(t *testing.T) {
 	testData := makeFakeDataEventEntity()
-	assert.NoError(t, NewEvent(testData.Task, testData.Status).Validate())
+	assert.NoError(t, NewEvent(testData.ID, testData.Status).Validate())
 }
