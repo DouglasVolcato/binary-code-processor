@@ -10,7 +10,7 @@ import (
 type testDataTaskEntity struct {
 	ID         string
 	Message    string
-	BinaryData []byte
+	BinaryCode string
 	CreatedAt  string
 	UpdatedAt  string
 }
@@ -20,7 +20,7 @@ func makeFakeDataTaskEntity() *testDataTaskEntity {
 	return &testDataTaskEntity{
 		ID:         faker.ID(),
 		Message:    faker.Phrase(),
-		BinaryData: faker.Binary(),
+		BinaryCode: faker.Phrase(),
 		CreatedAt:  faker.Date(),
 		UpdatedAt:  faker.Date(),
 	}
@@ -31,14 +31,14 @@ func TestNewTaskShouldCreateTask(t *testing.T) {
 	sut := NewTask(
 		testData.ID,
 		testData.Message,
-		testData.BinaryData,
+		testData.BinaryCode,
 		testData.CreatedAt,
 		testData.UpdatedAt,
 	)
 	assert.NotNil(t, sut)
 	assert.Equal(t, testData.ID, sut.ID)
 	assert.Equal(t, testData.Message, sut.Message)
-	assert.Equal(t, testData.BinaryData, sut.BinaryData)
+	assert.Equal(t, testData.BinaryCode, sut.BinaryCode)
 	assert.Equal(t, testData.CreatedAt, sut.CreatedAt)
 	assert.Equal(t, testData.UpdatedAt, sut.UpdatedAt)
 }
@@ -48,7 +48,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err := NewTask(
 		"",
 		testData.Message,
-		testData.BinaryData,
+		testData.BinaryCode,
 		testData.CreatedAt,
 		testData.UpdatedAt,
 	).Validate()
@@ -56,7 +56,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err = NewTask(
 		testData.ID,
 		"",
-		testData.BinaryData,
+		testData.BinaryCode,
 		testData.CreatedAt,
 		testData.UpdatedAt,
 	).Validate()
@@ -64,7 +64,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err = NewTask(
 		testData.ID,
 		testData.Message,
-		([]byte)(""),
+		"",
 		testData.CreatedAt,
 		testData.UpdatedAt,
 	).Validate()
@@ -72,7 +72,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err = NewTask(
 		testData.ID,
 		testData.Message,
-		testData.BinaryData,
+		testData.BinaryCode,
 		"",
 		testData.UpdatedAt,
 	).Validate()
@@ -80,7 +80,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err = NewTask(
 		testData.ID,
 		testData.Message,
-		testData.BinaryData,
+		testData.BinaryCode,
 		testData.CreatedAt,
 		"",
 	).Validate()
@@ -88,7 +88,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err = NewTask(
 		" ",
 		testData.Message,
-		testData.BinaryData,
+		testData.BinaryCode,
 		testData.CreatedAt,
 		testData.UpdatedAt,
 	).Validate()
@@ -96,7 +96,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err = NewTask(
 		testData.ID,
 		" ",
-		testData.BinaryData,
+		testData.BinaryCode,
 		testData.CreatedAt,
 		testData.UpdatedAt,
 	).Validate()
@@ -104,7 +104,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err = NewTask(
 		testData.ID,
 		testData.Message,
-		([]byte)(" "),
+		"",
 		testData.CreatedAt,
 		testData.UpdatedAt,
 	).Validate()
@@ -112,7 +112,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err = NewTask(
 		testData.ID,
 		testData.Message,
-		testData.BinaryData,
+		testData.BinaryCode,
 		" ",
 		testData.UpdatedAt,
 	).Validate()
@@ -120,7 +120,7 @@ func TestValidateShouldReturnErrorIfTaskDataIsInvalid(t *testing.T) {
 	err = NewTask(
 		testData.ID,
 		testData.Message,
-		testData.BinaryData,
+		testData.BinaryCode,
 		testData.CreatedAt,
 		" ",
 	).Validate()
@@ -132,7 +132,7 @@ func TestValidateShouldReturnNilIfTaskDataIsValid(t *testing.T) {
 	err := NewTask(
 		testData.ID,
 		testData.Message,
-		testData.BinaryData,
+		testData.BinaryCode,
 		testData.CreatedAt,
 		testData.UpdatedAt,
 	).Validate()

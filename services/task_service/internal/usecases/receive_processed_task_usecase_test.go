@@ -17,7 +17,6 @@ type mockProcessorForReceiveProcessed struct {
 }
 
 func (m *mockProcessorForReceiveProcessed) MoveTaskToProcessing(dto CreateTaskDTO) (entities.Task, error) {
-	// not used in these tests
 	return entities.Task{}, nil
 }
 

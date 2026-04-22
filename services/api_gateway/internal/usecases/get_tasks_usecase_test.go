@@ -33,7 +33,7 @@ func makeFakeTask() entities.Task {
 	return entities.Task{
 		ID:         faker.ID(),
 		Message:    faker.Phrase(),
-		BinaryData: faker.Binary(),
+		BinaryCode: faker.Phrase(),
 		CreatedAt:  faker.Date(),
 		UpdatedAt:  faker.Date(),
 	}

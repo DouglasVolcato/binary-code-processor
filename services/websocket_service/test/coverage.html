@@ -3,7 +3,7 @@
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-		<title>entities: Go Coverage Report</title>
+		<title>cmd: Go Coverage Report</title>
 		<style>
 			body {
 				background: black;
@@ -55,11 +55,13 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/event_entity.go (100.0%)</option>
+				<option value="file0">github.com/douglasvolcato/binary-code-processor/websocket_service/cmd/main.go (0.0%)</option>
 				
-				<option value="file1">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/task_entity.go (100.0%)</option>
+				<option value="file1">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/event_entity.go (100.0%)</option>
 				
-				<option value="file2">github.com/douglasvolcato/binary-code-processor/websocket_service/test/faker.go (0.0%)</option>
+				<option value="file2">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/task_entity.go (100.0%)</option>
+				
+				<option value="file3">github.com/douglasvolcato/binary-code-processor/websocket_service/test/faker.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -73,7 +75,12 @@
 		</div>
 		<div id="content">
 		
-		<pre class="file" id="file0" style="display: none">package entities
+		<pre class="file" id="file0" style="display: none">package main
+
+func main() {<span class="cov0" title="0">}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">package entities
 
 import (
         "strings"
@@ -104,7 +111,7 @@ func (e *Event) Validate() error <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file1" style="display: none">package entities
+		<pre class="file" id="file2" style="display: none">package entities
 
 import (
         "strings"
@@ -115,16 +122,16 @@ import (
 type Task struct {
         ID         string
         Message    string
-        BinaryData []byte
+        BinaryCode string
         CreatedAt  string
         UpdatedAt  string
 }
 
-func NewTask(id string, message string, binaryData []byte, createdAt string, updatedAt string) *Task <span class="cov8" title="1">{
+func NewTask(id string, message string, binaryCode string, createdAt string, updatedAt string) *Task <span class="cov8" title="1">{
         return &amp;Task{
                 ID:         id,
                 Message:    message,
-                BinaryData: binaryData,
+                BinaryCode: binaryCode,
                 CreatedAt:  createdAt,
                 UpdatedAt:  updatedAt,
         }
@@ -137,7 +144,7 @@ func (t *Task) Validate() error <span class="cov8" title="1">{
         <span class="cov8" title="1">if strings.TrimSpace(t.Message) == "" </span><span class="cov8" title="1">{
                 return assert.AnError
         }</span>
-        <span class="cov8" title="1">if strings.TrimSpace(string(t.BinaryData)) == "" </span><span class="cov8" title="1">{
+        <span class="cov8" title="1">if strings.TrimSpace(string(t.BinaryCode)) == "" </span><span class="cov8" title="1">{
                 return assert.AnError
         }</span>
         <span class="cov8" title="1">if strings.TrimSpace(t.CreatedAt) == "" </span><span class="cov8" title="1">{
@@ -150,7 +157,7 @@ func (t *Task) Validate() error <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file2" style="display: none">package test
+		<pre class="file" id="file3" style="display: none">package test
 
 import (
         "github.com/go-faker/faker/v4"

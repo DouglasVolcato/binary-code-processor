@@ -22,7 +22,7 @@ func makeFakeDataEventEntity(invalidTask bool) *testDataEventEntity {
 		Task: Task{
 			ID:         id,
 			Message:    faker.Phrase(),
-			BinaryData: faker.Binary(),
+			BinaryCode: faker.Phrase(),
 			CreatedAt:  faker.Date(),
 			UpdatedAt:  faker.Date(),
 		},
@@ -36,7 +36,7 @@ func TestNewEventShouldCreateEvent(t *testing.T) {
 	assert.NotNil(t, sut)
 	assert.Equal(t, testData.Task.ID, sut.Task.ID)
 	assert.Equal(t, testData.Task.Message, sut.Task.Message)
-	assert.Equal(t, testData.Task.BinaryData, sut.Task.BinaryData)
+	assert.Equal(t, testData.Task.BinaryCode, sut.Task.BinaryCode)
 	assert.Equal(t, testData.Task.CreatedAt, sut.Task.CreatedAt)
 	assert.Equal(t, testData.Task.UpdatedAt, sut.Task.UpdatedAt)
 	assert.Equal(t, testData.Status, sut.Status)

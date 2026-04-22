@@ -3,7 +3,7 @@
 <html>
 	<head>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-		<title>entities: Go Coverage Report</title>
+		<title>cmd: Go Coverage Report</title>
 		<style>
 			body {
 				background: black;
@@ -55,7 +55,7 @@
 			<div id="nav">
 				<select id="files">
 				
-				<option value="file0">github.com/douglasvolcato/binary-code-processor/processing_service/internal/entities/event_entity.go (100.0%)</option>
+				<option value="file0">github.com/douglasvolcato/binary-code-processor/processing_service/cmd/main.go (0.0%)</option>
 				
 				<option value="file1">github.com/douglasvolcato/binary-code-processor/processing_service/internal/entities/task_entity.go (100.0%)</option>
 				
@@ -63,7 +63,9 @@
 				
 				<option value="file3">github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task_grpc.pb.go (0.0%)</option>
 				
-				<option value="file4">github.com/douglasvolcato/binary-code-processor/processing_service/test/faker.go (0.0%)</option>
+				<option value="file4">github.com/douglasvolcato/binary-code-processor/processing_service/internal/usecases/process_task_usecase.go (93.3%)</option>
+				
+				<option value="file5">github.com/douglasvolcato/binary-code-processor/processing_service/test/faker.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -77,35 +79,9 @@
 		</div>
 		<div id="content">
 		
-		<pre class="file" id="file0" style="display: none">package entities
+		<pre class="file" id="file0" style="display: none">package main
 
-import (
-        "strings"
-
-        "github.com/stretchr/testify/assert"
-)
-
-type Event struct {
-        Task   Task
-        Status string
-}
-
-func NewEvent(task Task, status string) *Event <span class="cov8" title="1">{
-        return &amp;Event{
-                Task:   task,
-                Status: status,
-        }
-}</span>
-
-func (e *Event) Validate() error <span class="cov8" title="1">{
-        if strings.TrimSpace(e.Status) == "" </span><span class="cov8" title="1">{
-                return assert.AnError
-        }</span>
-        <span class="cov8" title="1">if err := e.Task.Validate(); err != nil </span><span class="cov8" title="1">{
-                return err
-        }</span>
-        <span class="cov8" title="1">return nil</span>
-}
+func main() {<span class="cov0" title="0">}</span>
 </pre>
 		
 		<pre class="file" id="file1" style="display: none">package entities
@@ -119,16 +95,16 @@ import (
 type Task struct {
         ID         string
         Message    string
-        BinaryData []byte
+        BinaryCode string
         CreatedAt  string
         UpdatedAt  string
 }
 
-func NewTask(id string, message string, binaryData []byte, createdAt string, updatedAt string) *Task <span class="cov8" title="1">{
+func NewTask(id string, message string, binaryCode string, createdAt string, updatedAt string) *Task <span class="cov8" title="1">{
         return &amp;Task{
                 ID:         id,
                 Message:    message,
-                BinaryData: binaryData,
+                BinaryCode: binaryCode,
                 CreatedAt:  createdAt,
                 UpdatedAt:  updatedAt,
         }
@@ -141,7 +117,7 @@ func (t *Task) Validate() error <span class="cov8" title="1">{
         <span class="cov8" title="1">if strings.TrimSpace(t.Message) == "" </span><span class="cov8" title="1">{
                 return assert.AnError
         }</span>
-        <span class="cov8" title="1">if strings.TrimSpace(string(t.BinaryData)) == "" </span><span class="cov8" title="1">{
+        <span class="cov8" title="1">if strings.TrimSpace(string(t.BinaryCode)) == "" </span><span class="cov8" title="1">{
                 return assert.AnError
         }</span>
         <span class="cov8" title="1">if strings.TrimSpace(t.CreatedAt) == "" </span><span class="cov8" title="1">{
@@ -446,7 +422,67 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 }
 </pre>
 		
-		<pre class="file" id="file4" style="display: none">package test
+		<pre class="file" id="file4" style="display: none">package usecases
+
+import (
+        "fmt"
+        "strings"
+)
+
+type ProcessTaskUseCase struct {
+        Repo      TaskRepositoryInterface
+        Processor TaskProcessorInterface
+}
+
+func NewProcessTaskUseCase(repo TaskRepositoryInterface, processor TaskProcessorInterface) *ProcessTaskUseCase <span class="cov8" title="1">{
+        return &amp;ProcessTaskUseCase{
+                Repo:      repo,
+                Processor: processor,
+        }
+}</span>
+
+type ProcessTaskInput struct {
+        ID string
+}
+
+type ProcessTaskOutput struct {
+        ID         string
+        BinaryCode string
+}
+
+func (u *ProcessTaskUseCase) Execute(input *ProcessTaskInput) (*ProcessTaskOutput, error) <span class="cov8" title="1">{
+        task, err := u.Repo.GetTaskByID(input.ID)
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">binaryCode, err := u.convertMessageToBinaryCode(task.Message)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">err = u.Processor.FinishProcessing(FinishProcessingDTO{
+                ID:         task.ID,
+                BinaryCode: binaryCode,
+        })
+        if err != nil </span><span class="cov8" title="1">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return &amp;ProcessTaskOutput{
+                ID:         task.ID,
+                BinaryCode: binaryCode,
+        }, nil</span>
+}
+
+func (u *ProcessTaskUseCase) convertMessageToBinaryCode(message string) (string, error) <span class="cov8" title="1">{
+        result := make([]string, len(message))
+
+        for i, char := range message </span><span class="cov8" title="1">{
+                result[i] = fmt.Sprintf("%08b", char)
+        }</span>
+        <span class="cov8" title="1">return strings.Join(result, ""), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package test
 
 import (
         "github.com/go-faker/faker/v4"

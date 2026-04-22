@@ -9,16 +9,16 @@ import (
 type Task struct {
 	ID         string
 	Message    string
-	BinaryData []byte
+	BinaryCode string
 	CreatedAt  string
 	UpdatedAt  string
 }
 
-func NewTask(id string, message string, binaryData []byte, createdAt string, updatedAt string) *Task {
+func NewTask(id string, message string, binaryCode string, createdAt string, updatedAt string) *Task {
 	return &Task{
 		ID:         id,
 		Message:    message,
-		BinaryData: binaryData,
+		BinaryCode: binaryCode,
 		CreatedAt:  createdAt,
 		UpdatedAt:  updatedAt,
 	}
@@ -31,7 +31,7 @@ func (t *Task) Validate() error {
 	if strings.TrimSpace(t.Message) == "" {
 		return assert.AnError
 	}
-	if strings.TrimSpace(string(t.BinaryData)) == "" {
+	if strings.TrimSpace(string(t.BinaryCode)) == "" {
 		return assert.AnError
 	}
 	if strings.TrimSpace(t.CreatedAt) == "" {

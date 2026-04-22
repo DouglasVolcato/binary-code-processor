@@ -1,4 +1,5 @@
 mode: set
+github.com/douglasvolcato/binary-code-processor/task_service/cmd/main.go:3.14,3.15 0 0
 github.com/douglasvolcato/binary-code-processor/task_service/internal/entities/event_entity.go:14.48,19.2 1 1
 github.com/douglasvolcato/binary-code-processor/task_service/internal/entities/event_entity.go:21.34,22.39 1 1
 github.com/douglasvolcato/binary-code-processor/task_service/internal/entities/event_entity.go:22.39,24.3 1 1
@@ -17,11 +18,22 @@ github.com/douglasvolcato/binary-code-processor/task_service/internal/entities/t
 github.com/douglasvolcato/binary-code-processor/task_service/internal/entities/task_entity.go:40.2,40.42 1 1
 github.com/douglasvolcato/binary-code-processor/task_service/internal/entities/task_entity.go:40.42,42.3 1 1
 github.com/douglasvolcato/binary-code-processor/task_service/internal/entities/task_entity.go:43.2,43.12 1 1
-github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:9.32,11.2 1 0
-github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:13.34,15.2 1 0
-github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:17.36,19.2 1 0
-github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:21.36,23.2 1 0
-github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:25.34,27.2 1 0
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_task_by_id_usecase.go:9.78,13.2 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_task_by_id_usecase.go:23.91,25.16 2 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_task_by_id_usecase.go:25.16,27.3 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_task_by_id_usecase.go:28.2,30.8 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_tasks_usecase.go:9.72,13.2 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_tasks_usecase.go:24.82,26.16 2 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_tasks_usecase.go:26.16,28.3 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_tasks_usecase.go:29.2,31.8 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_processed_task_usecase.go:7.95,11.2 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_processed_task_usecase.go:22.118,24.16 2 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_processed_task_usecase.go:24.16,26.3 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_processed_task_usecase.go:27.2,29.8 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_task_to_process_usecase.go:10.123,15.2 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_task_to_process_usecase.go:26.118,32.16 3 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_task_to_process_usecase.go:32.16,34.3 1 1
+github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_task_to_process_usecase.go:35.2,38.8 1 1
 github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task.pb.go:31.47,36.2 4 0
 github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task.pb.go:38.55,40.2 1 0
 github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task.pb.go:42.53,42.54 0 0
@@ -131,3 +143,8 @@ github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc
 github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task_grpc.pb.go:149.2,153.77 2 0
 github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task_grpc.pb.go:153.77,155.3 1 0
 github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task_grpc.pb.go:156.2,156.44 1 0
+github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:9.32,11.2 1 0
+github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:13.34,15.2 1 0
+github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:17.36,19.2 1 0
+github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:21.36,23.2 1 0
+github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go:25.34,27.2 1 0
