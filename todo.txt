@@ -2,7 +2,7 @@ X scripts makefile
 X usecases de cada serviço com suas abstracoes e testes de mocks
 -containers docker e docker compose geral
 X integração com banco de dados
--interação com grpc
+X interação com grpc
 -interação com graphql
 -integração com rabbitmq
 -services de integrações
