@@ -120,7 +120,7 @@ const file_task_proto_rawDesc = "" +
 	"\x19SendProcessedTaskResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage2g\n" +
 	"\vTaskService\x12X\n" +
-	"\x11SendProcessedTask\x12\x1e.task.SendProcessedTaskRequest\x1a\x1f.task.SendProcessedTaskResponse\"\x00(\x01BYZWgithub.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task;taskb\x06proto3"
+	"\x11SendProcessedTask\x12\x1e.task.SendProcessedTaskRequest\x1a\x1f.task.SendProcessedTaskResponse\"\x00(\x01BbZ`github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task;taskb\x06proto3"
 
 var (
 	file_task_proto_rawDescOnce sync.Once
