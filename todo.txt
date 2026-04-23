@@ -4,7 +4,7 @@ X usecases de cada serviço com suas abstracoes e testes de mocks
 X integração com banco de dados
 X interação com grpc
 - interação com graphql
-- integração com rabbitmq
+X integração com rabbitmq
 - lógica das integrações
 - servers
 - frontend
