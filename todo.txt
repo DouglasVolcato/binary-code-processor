@@ -1,12 +1,12 @@
 X scripts makefile
 X usecases de cada serviço com suas abstracoes e testes de mocks
--containers docker e docker compose geral
+- containers docker e docker compose geral
 X integração com banco de dados
 X interação com grpc
--interação com graphql
--integração com rabbitmq
--services de integrações
--servers
--frontend
--prometheus e grafana
--habilitar kubernetes
+- interação com graphql
+- integração com rabbitmq
+- lógica das integrações
+- servers
+- frontend
+- prometheus e grafana
+- habilitar kubernetes
