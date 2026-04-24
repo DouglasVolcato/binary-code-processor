@@ -137,21 +137,14 @@
             <span class="badge badge-soft rounded-pill">sendTask</span>
           </div>
           <form id="task-form" class="stack">
-            <div>
-              <label for="messages" class="form-label fw-semibold">Mensagens</label>
-              <textarea id="messages" class="form-control codebox" rows="8" placeholder="Digite uma mensagem por linha ou separadas por vírgula"></textarea>
-              <div class="form-text muted">Cada linha vira uma tarefa enviada ao API Gateway.</div>
-            </div>
-            <div class="row g-3">
-              <div class="col-6">
-                <label for="limit" class="form-label fw-semibold">Limit</label>
-                <input id="limit" type="number" class="form-control" min="1" value="20">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+              <div>
+                <label class="form-label fw-semibold mb-1">Mensagens</label>
+                <div class="form-text muted mb-0">Adicione quantos campos quiser. Cada campo vira uma task.</div>
               </div>
-              <div class="col-6">
-                <label for="offset" class="form-label fw-semibold">Offset</label>
-                <input id="offset" type="number" class="form-control" min="0" value="0">
-              </div>
+              <button type="button" id="add-message-btn" class="btn btn-outline-light btn-sm">Adicionar input</button>
             </div>
+            <div id="message-list" class="stack"></div>
             <div class="d-grid gap-2 d-sm-flex">
               <button type="submit" class="btn btn-primary px-4">Enviar</button>
               <button type="button" id="refresh-btn" class="btn btn-outline-light px-4">Atualizar lista</button>
@@ -168,7 +161,10 @@
               <h2 class="h4 mb-1">Tarefas recentes</h2>
               <p class="muted mb-0">Consulta GraphQL do API Gateway.</p>
             </div>
-            <span id="task-count" class="badge badge-soft rounded-pill">0 tasks</span>
+            <div class="d-flex align-items-center gap-2">
+              <span id="page-info" class="badge badge-soft rounded-pill">Página 1</span>
+              <span id="task-count" class="badge badge-soft rounded-pill">0 tasks</span>
+            </div>
           </div>
           <div class="table-responsive">
             <table class="table table-dark table-hover align-middle mb-0">
@@ -184,6 +180,13 @@
                 <tr><td colspan="4" class="muted">Carregando...</td></tr>
               </tbody>
             </table>
+          </div>
+          <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mt-3">
+            <div class="muted small">A navegação muda a página, sem expor limit/offset na interface.</div>
+            <div class="d-flex gap-2">
+              <button type="button" id="prev-page-btn" class="btn btn-outline-light btn-sm">Anterior</button>
+              <button type="button" id="next-page-btn" class="btn btn-outline-light btn-sm">Próxima</button>
+            </div>
           </div>
         </section>
 
@@ -205,6 +208,9 @@
     const state = {
       tasks: [],
       ws: null,
+      page: 1,
+      pageSize: 10,
+      hasNextPage: false,
     };
 
     const graphqlUrl = "/query";
@@ -213,15 +219,48 @@
 
     const taskTable = document.getElementById("task-table");
     const taskCount = document.getElementById("task-count");
+    const pageInfo = document.getElementById("page-info");
     const liveEvents = document.getElementById("live-events");
     const wsDot = document.getElementById("ws-dot");
     const wsStatus = document.getElementById("ws-status");
     const sendFeedback = document.getElementById("send-feedback");
+    const messageList = document.getElementById("message-list");
+    const addMessageBtn = document.getElementById("add-message-btn");
+    const prevPageBtn = document.getElementById("prev-page-btn");
+    const nextPageBtn = document.getElementById("next-page-btn");
 
-    function normalizeMessages(value) {
-      return value
-        .split(/\n|,/g)
-        .map((item) => item.trim())
+    function createMessageField(value = "") {
+      const row = document.createElement("div");
+      row.className = "d-flex gap-2 align-items-start";
+      row.innerHTML = `
+        <div class="flex-grow-1">
+          <input type="text" class="form-control message-input" placeholder="Digite uma mensagem" value="${escapeHtml(value)}">
+        </div>
+        <button type="button" class="btn btn-outline-light remove-message-btn" aria-label="Remover campo">Remover</button>
+      `;
+      row.querySelector(".remove-message-btn").addEventListener("click", () => {
+        if (messageList.children.length === 1) {
+          row.querySelector(".message-input").value = "";
+          row.querySelector(".message-input").focus();
+          return;
+        }
+        row.remove();
+      });
+      return row;
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll("\"", "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function getMessagesFromInputs() {
+      return Array.from(document.querySelectorAll(".message-input"))
+        .map((input) => input.value.trim())
         .filter(Boolean);
     }
 
@@ -246,6 +285,9 @@
     function renderTasks(tasks) {
       state.tasks = tasks;
       taskCount.textContent = `${tasks.length} task${tasks.length === 1 ? "" : "s"}`;
+      pageInfo.textContent = `Página ${state.page}`;
+      prevPageBtn.disabled = state.page <= 1;
+      nextPageBtn.disabled = !state.hasNextPage;
       if (!tasks.length) {
         taskTable.innerHTML = '<tr><td colspan="4" class="muted">Nenhuma tarefa encontrada.</td></tr>';
         return;
@@ -278,8 +320,8 @@
     }
 
     async function loadTasks() {
-      const limit = Number(document.getElementById("limit").value || 20);
-      const offset = Number(document.getElementById("offset").value || 0);
+      const limit = state.pageSize;
+      const offset = (state.page - 1) * state.pageSize;
       const query = `
         query Tasks($limit: Int, $offset: Int) {
           tasks(limit: $limit, offset: $offset) {
@@ -292,13 +334,14 @@
         }
       `;
       const data = await graphqlRequest(query, { limit, offset });
-      renderTasks(data.tasks || []);
+      const tasks = data.tasks || [];
+      state.hasNextPage = tasks.length === state.pageSize;
+      renderTasks(tasks);
     }
 
     async function sendTasks(event) {
       event.preventDefault();
-      const raw = document.getElementById("messages").value;
-      const messages = normalizeMessages(raw);
+      const messages = getMessagesFromInputs();
       if (!messages.length) {
         sendFeedback.textContent = "Informe ao menos uma mensagem.";
         return;
@@ -320,7 +363,14 @@
         sendFeedback.textContent = "Enviando...";
         const data = await graphqlRequest(mutation, { messages });
         sendFeedback.textContent = `${data.sendTask.length} tarefa(s) enviada(s).`;
-        document.getElementById("messages").value = "";
+        Array.from(document.querySelectorAll(".message-input")).forEach((input, index) => {
+          if (index === 0) {
+            input.value = "";
+          } else {
+            input.closest(".d-flex").remove();
+          }
+        });
+        state.page = 1;
         await loadTasks();
       } catch (error) {
         sendFeedback.textContent = `Falha ao enviar: ${error.message}`;
@@ -365,9 +415,29 @@
     }
 
     document.getElementById("task-form").addEventListener("submit", sendTasks);
+    addMessageBtn.addEventListener("click", () => {
+      messageList.appendChild(createMessageField());
+      messageList.lastElementChild.querySelector(".message-input").focus();
+    });
+    prevPageBtn.addEventListener("click", () => {
+      if (state.page > 1) {
+        state.page -= 1;
+        loadTasks().catch((error) => {
+          sendFeedback.textContent = `Falha ao carregar tarefas: ${error.message}`;
+        });
+      }
+    });
+    nextPageBtn.addEventListener("click", () => {
+      state.page += 1;
+      loadTasks().catch((error) => {
+        sendFeedback.textContent = `Falha ao carregar tarefas: ${error.message}`;
+      });
+    });
     document.getElementById("refresh-btn").addEventListener("click", () => loadTasks().catch((error) => {
       sendFeedback.textContent = `Falha ao carregar tarefas: ${error.message}`;
     }));
+
+    messageList.appendChild(createMessageField());
 
     loadTasks().catch((error) => {
       taskTable.innerHTML = `<tr><td colspan="4" class="text-danger">Erro ao carregar tarefas: ${error.message}</td></tr>`;
