@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Binary Code Processor</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #08111f;
+      --panel: rgba(10, 18, 32, 0.82);
+      --panel-strong: #0f1a2f;
+      --text: #e7eefc;
+      --muted: #9cb0d4;
+      --line: rgba(160, 182, 220, 0.18);
+      --accent: #7dd3fc;
+      --accent-2: #8b5cf6;
+    }
+    html, body {
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top left, rgba(125, 211, 252, 0.18), transparent 26%),
+        radial-gradient(circle at right top, rgba(139, 92, 246, 0.16), transparent 30%),
+        linear-gradient(180deg, #07111f 0%, #0a1220 45%, #040812 100%);
+      color: var(--text);
+      font-family: "Inter", system-ui, sans-serif;
+    }
+    .glass {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(18px);
+    }
+    .hero {
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(135deg, rgba(125, 211, 252, 0.12), rgba(139, 92, 246, 0.14)),
+        var(--panel-strong);
+    }
+    .muted { color: var(--muted); }
+    .codebox {
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      background: rgba(6, 11, 20, 0.55);
+      border: 1px solid var(--line);
+      color: #d6e5ff;
+    }
+    .form-control, .form-select {
+      background: rgba(6, 11, 20, 0.72);
+      border-color: var(--line);
+      color: var(--text);
+    }
+    .form-control:focus, .form-select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 .25rem rgba(125, 211, 252, 0.18);
+      background: rgba(6, 11, 20, 0.72);
+      color: var(--text);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), #38bdf8);
+      border: none;
+      color: #04111d;
+      font-weight: 700;
+    }
+    .btn-outline-light {
+      border-color: rgba(255,255,255,0.24);
+    }
+    .badge-soft {
+      background: rgba(125, 211, 252, 0.12);
+      border: 1px solid rgba(125, 211, 252, 0.24);
+      color: #b7ecff;
+    }
+    .table-dark {
+      --bs-table-bg: rgba(5, 10, 18, 0.32);
+      --bs-table-striped-bg: rgba(255,255,255,0.03);
+      --bs-table-border-color: rgba(160, 182, 220, 0.14);
+    }
+    .live-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      display: inline-block;
+      background: #ef4444;
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+    }
+    .live-dot.connected {
+      background: #22c55e;
+    }
+    .stack {
+      display: grid;
+      gap: .75rem;
+    }
+    .event-item {
+      border-left: 3px solid var(--accent);
+      background: rgba(255,255,255,0.03);
+    }
+    .hero h1 {
+      letter-spacing: -0.04em;
+    }
+    @media (max-width: 991px) {
+      .hero h1 {
+        font-size: 2.2rem;
+      }
+    }
+  </style>
+</head>
+<body data-ws-url="{{.WebSocketURL}}">
+  <main class="container py-4 py-lg-5">
+    <section class="hero rounded-4 p-4 p-lg-5 mb-4">
+      <div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3">
+        <div>
+          <span class="badge badge-soft rounded-pill mb-3 px-3 py-2">GraphQL + gRPC + RabbitMQ + WebSocket</span>
+          <h1 class="display-5 fw-bold mb-3">Binary Code Processor</h1>
+          <p class="lead muted mb-0 col-lg-9">
+            Envie mensagens, acompanhe a fila, veja o processamento e receba a atualização final em tempo real.
+          </p>
+        </div>
+        <div class="glass rounded-4 p-3">
+          <div class="d-flex align-items-center gap-2">
+            <span id="ws-dot" class="live-dot"></span>
+            <div>
+              <div class="fw-semibold">WebSocket</div>
+              <small id="ws-status" class="muted">desconectado</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="row g-4">
+      <div class="col-12 col-xl-4">
+        <section class="glass rounded-4 p-4 h-100">
+          <div class="d-flex align-items-center justify-content-between mb-3">
+            <h2 class="h4 mb-0">Enviar tarefas</h2>
+            <span class="badge badge-soft rounded-pill">sendTask</span>
+          </div>
+          <form id="task-form" class="stack">
+            <div>
+              <label for="messages" class="form-label fw-semibold">Mensagens</label>
+              <textarea id="messages" class="form-control codebox" rows="8" placeholder="Digite uma mensagem por linha ou separadas por vírgula"></textarea>
+              <div class="form-text muted">Cada linha vira uma tarefa enviada ao API Gateway.</div>
+            </div>
+            <div class="row g-3">
+              <div class="col-6">
+                <label for="limit" class="form-label fw-semibold">Limit</label>
+                <input id="limit" type="number" class="form-control" min="1" value="20">
+              </div>
+              <div class="col-6">
+                <label for="offset" class="form-label fw-semibold">Offset</label>
+                <input id="offset" type="number" class="form-control" min="0" value="0">
+              </div>
+            </div>
+            <div class="d-grid gap-2 d-sm-flex">
+              <button type="submit" class="btn btn-primary px-4">Enviar</button>
+              <button type="button" id="refresh-btn" class="btn btn-outline-light px-4">Atualizar lista</button>
+            </div>
+          </form>
+          <div id="send-feedback" class="mt-3 small muted"></div>
+        </section>
+      </div>
+
+      <div class="col-12 col-xl-8">
+        <section class="glass rounded-4 p-4 mb-4">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+            <div>
+              <h2 class="h4 mb-1">Tarefas recentes</h2>
+              <p class="muted mb-0">Consulta GraphQL do API Gateway.</p>
+            </div>
+            <span id="task-count" class="badge badge-soft rounded-pill">0 tasks</span>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-dark table-hover align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Message</th>
+                  <th>Binary Code</th>
+                  <th>Created At</th>
+                </tr>
+              </thead>
+              <tbody id="task-table">
+                <tr><td colspan="4" class="muted">Carregando...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="glass rounded-4 p-4">
+          <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2 mb-3">
+            <div>
+              <h2 class="h4 mb-1">Eventos ao vivo</h2>
+              <p class="muted mb-0">Atualizações recebidas do WebSocket Service.</p>
+            </div>
+            <small class="muted">endpoint: <code id="ws-url" class="text-info"></code></small>
+          </div>
+          <div id="live-events" class="stack"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const state = {
+      tasks: [],
+      ws: null,
+    };
+
+    const graphqlUrl = "/query";
+    const websocketUrl = document.body.dataset.wsUrl || "ws://localhost:8082/ws";
+    document.getElementById("ws-url").textContent = websocketUrl;
+
+    const taskTable = document.getElementById("task-table");
+    const taskCount = document.getElementById("task-count");
+    const liveEvents = document.getElementById("live-events");
+    const wsDot = document.getElementById("ws-dot");
+    const wsStatus = document.getElementById("ws-status");
+    const sendFeedback = document.getElementById("send-feedback");
+
+    function normalizeMessages(value) {
+      return value
+        .split(/\n|,/g)
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    async function graphqlRequest(query, variables) {
+      const response = await fetch(graphqlUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ query, variables }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok || payload.errors) {
+        const message = payload.errors?.[0]?.message || response.statusText;
+        throw new Error(message);
+      }
+
+      return payload.data;
+    }
+
+    function renderTasks(tasks) {
+      state.tasks = tasks;
+      taskCount.textContent = `${tasks.length} task${tasks.length === 1 ? "" : "s"}`;
+      if (!tasks.length) {
+        taskTable.innerHTML = '<tr><td colspan="4" class="muted">Nenhuma tarefa encontrada.</td></tr>';
+        return;
+      }
+
+      taskTable.innerHTML = tasks.map((task) => `
+        <tr>
+          <td><code>${task.id}</code></td>
+          <td>${task.message}</td>
+          <td><code>${task.binaryCode || "pending"}</code></td>
+          <td>${task.createdAt}</td>
+        </tr>
+      `).join("");
+    }
+
+    function prependEvent(task, label) {
+      const node = document.createElement("div");
+      node.className = "event-item rounded-3 p-3";
+      node.innerHTML = `
+        <div class="d-flex justify-content-between align-items-start gap-3">
+          <div>
+            <div class="fw-semibold">${label}</div>
+            <div class="small muted mb-2">Task ${task.id}</div>
+            <div><code>${task.binaryCode || "pending"}</code></div>
+          </div>
+          <span class="badge badge-soft rounded-pill">${new Date().toLocaleTimeString()}</span>
+        </div>
+      `;
+      liveEvents.prepend(node);
+    }
+
+    async function loadTasks() {
+      const limit = Number(document.getElementById("limit").value || 20);
+      const offset = Number(document.getElementById("offset").value || 0);
+      const query = `
+        query Tasks($limit: Int, $offset: Int) {
+          tasks(limit: $limit, offset: $offset) {
+            id
+            message
+            binaryCode
+            createdAt
+            updatedAt
+          }
+        }
+      `;
+      const data = await graphqlRequest(query, { limit, offset });
+      renderTasks(data.tasks || []);
+    }
+
+    async function sendTasks(event) {
+      event.preventDefault();
+      const raw = document.getElementById("messages").value;
+      const messages = normalizeMessages(raw);
+      if (!messages.length) {
+        sendFeedback.textContent = "Informe ao menos uma mensagem.";
+        return;
+      }
+
+      const mutation = `
+        mutation SendTask($messages: [String!]!) {
+          sendTask(messages: $messages) {
+            id
+            message
+            binaryCode
+            createdAt
+            updatedAt
+          }
+        }
+      `;
+
+      try {
+        sendFeedback.textContent = "Enviando...";
+        const data = await graphqlRequest(mutation, { messages });
+        sendFeedback.textContent = `${data.sendTask.length} tarefa(s) enviada(s).`;
+        document.getElementById("messages").value = "";
+        await loadTasks();
+      } catch (error) {
+        sendFeedback.textContent = `Falha ao enviar: ${error.message}`;
+      }
+    }
+
+    function connectWebSocket() {
+      if (state.ws) {
+        state.ws.close();
+      }
+
+      const socket = new WebSocket(websocketUrl);
+      state.ws = socket;
+      wsStatus.textContent = "conectando...";
+
+      socket.addEventListener("open", () => {
+        wsDot.classList.add("connected");
+        wsStatus.textContent = "conectado";
+      });
+
+      socket.addEventListener("message", (event) => {
+        try {
+          const task = JSON.parse(event.data);
+          if (task?.id) {
+            prependEvent(task, "Task processada");
+            loadTasks().catch(() => {});
+          }
+        } catch (error) {
+          prependEvent({ id: "invalid", binaryCode: event.data }, "Payload bruto");
+        }
+      });
+
+      socket.addEventListener("close", () => {
+        wsDot.classList.remove("connected");
+        wsStatus.textContent = "desconectado";
+        setTimeout(connectWebSocket, 2500);
+      });
+
+      socket.addEventListener("error", () => {
+        wsStatus.textContent = "erro de conexão";
+      });
+    }
+
+    document.getElementById("task-form").addEventListener("submit", sendTasks);
+    document.getElementById("refresh-btn").addEventListener("click", () => loadTasks().catch((error) => {
+      sendFeedback.textContent = `Falha ao carregar tarefas: ${error.message}`;
+    }));
+
+    loadTasks().catch((error) => {
+      taskTable.innerHTML = `<tr><td colspan="4" class="text-danger">Erro ao carregar tarefas: ${error.message}</td></tr>`;
+    });
+    connectWebSocket();
+  </script>
+</body>
+</html>
