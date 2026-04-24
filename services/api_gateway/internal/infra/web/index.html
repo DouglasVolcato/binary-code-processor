@@ -67,6 +67,25 @@
     .btn-outline-light {
       border-color: rgba(255,255,255,0.24);
     }
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.5rem;
+      height: 2.5rem;
+      padding: 0;
+      border-radius: 999px;
+      line-height: 1;
+    }
+    .icon-btn svg {
+      width: 1rem;
+      height: 1rem;
+      fill: currentColor;
+    }
+    .icon-btn.icon-btn-lg {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
     .badge-soft {
       background: rgba(125, 211, 252, 0.12);
       border: 1px solid rgba(125, 211, 252, 0.24);
@@ -106,12 +125,11 @@
     }
   </style>
 </head>
-<body data-ws-url="{{.WebSocketURL}}">
+<body data-ws-url="{{.WebSocketURL}}" data-ws-port="{{.WebSocketPort}}">
   <main class="container py-4 py-lg-5">
     <section class="hero rounded-4 p-4 p-lg-5 mb-4">
       <div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3">
         <div>
-          <span class="badge badge-soft rounded-pill mb-3 px-3 py-2">GraphQL + gRPC + RabbitMQ + WebSocket</span>
           <h1 class="display-5 fw-bold mb-3">Binary Code Processor</h1>
           <p class="lead muted mb-0 col-lg-9">
             Envie mensagens, acompanhe a fila, veja o processamento e receba a atualização final em tempo real.
@@ -138,16 +156,24 @@
           </div>
           <form id="task-form" class="stack">
             <div class="d-flex align-items-center justify-content-between gap-3">
-              <div>
-                <label class="form-label fw-semibold mb-1">Mensagens</label>
-                <div class="form-text muted mb-0">Adicione quantos campos quiser. Cada campo vira uma task.</div>
-              </div>
-              <button type="button" id="add-message-btn" class="btn btn-outline-light btn-sm">Adicionar input</button>
+            <div>
+              <label class="form-label fw-semibold mb-1">Mensagens</label>
+              <div class="form-text muted mb-0">Adicione quantos campos quiser. Cada campo vira uma task.</div>
+            </div>
+              <button type="button" id="add-message-btn" class="btn btn-outline-light icon-btn icon-btn-lg" aria-label="Adicionar campo" title="Adicionar campo">
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M8 1.75a.75.75 0 0 1 .75.75v4.75h4.75a.75.75 0 0 1 0 1.5H8.75v4.75a.75.75 0 0 1-1.5 0V8.75H2.5a.75.75 0 0 1 0-1.5h4.75V2.5A.75.75 0 0 1 8 1.75z"/>
+                </svg>
+              </button>
             </div>
             <div id="message-list" class="stack"></div>
             <div class="d-grid gap-2 d-sm-flex">
               <button type="submit" class="btn btn-primary px-4">Enviar</button>
-              <button type="button" id="refresh-btn" class="btn btn-outline-light px-4">Atualizar lista</button>
+              <button type="button" id="refresh-btn" class="btn btn-outline-light icon-btn icon-btn-lg" aria-label="Atualizar lista" title="Atualizar lista">
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M8 3a5 5 0 1 0 4.546 2.914.75.75 0 1 1 1.364-.628A6.5 6.5 0 1 1 8 1.5V0l3 2.25L8 4.5V3z"/>
+                </svg>
+              </button>
             </div>
           </form>
           <div id="send-feedback" class="mt-3 small muted"></div>
@@ -182,10 +208,17 @@
             </table>
           </div>
           <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2 mt-3">
-            <div class="muted small">A navegação muda a página, sem expor limit/offset na interface.</div>
             <div class="d-flex gap-2">
-              <button type="button" id="prev-page-btn" class="btn btn-outline-light btn-sm">Anterior</button>
-              <button type="button" id="next-page-btn" class="btn btn-outline-light btn-sm">Próxima</button>
+              <button type="button" id="prev-page-btn" class="btn btn-outline-light icon-btn" aria-label="Página anterior" title="Página anterior">
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M10.53 3.47a.75.75 0 0 1 0 1.06L7.06 8l3.47 3.47a.75.75 0 1 1-1.06 1.06l-4-4a.75.75 0 0 1 0-1.06l4-4a.75.75 0 0 1 1.06 0z"/>
+                </svg>
+              </button>
+              <button type="button" id="next-page-btn" class="btn btn-outline-light icon-btn" aria-label="Próxima página" title="Próxima página">
+                <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M5.47 12.53a.75.75 0 0 1 0-1.06L8.94 8 5.47 4.53a.75.75 0 1 1 1.06-1.06l4 4a.75.75 0 0 1 0 1.06l-4 4a.75.75 0 0 1-1.06 0z"/>
+                </svg>
+              </button>
             </div>
           </div>
         </section>
@@ -214,7 +247,15 @@
     };
 
     const graphqlUrl = "/query";
-    const websocketUrl = document.body.dataset.wsUrl || "ws://localhost:8082/ws";
+    const websocketUrl = (() => {
+      if (document.body.dataset.wsUrl) {
+        return document.body.dataset.wsUrl;
+      }
+      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+      const host = window.location.hostname || "localhost";
+      const port = document.body.dataset.wsPort || "8082";
+      return `${protocol}://${host}:${port}/ws`;
+    })();
     document.getElementById("ws-url").textContent = websocketUrl;
 
     const taskTable = document.getElementById("task-table");
@@ -236,7 +277,11 @@
         <div class="flex-grow-1">
           <input type="text" class="form-control message-input" placeholder="Digite uma mensagem" value="${escapeHtml(value)}">
         </div>
-        <button type="button" class="btn btn-outline-light remove-message-btn" aria-label="Remover campo">Remover</button>
+        <button type="button" class="btn btn-outline-light icon-btn remove-message-btn" aria-label="Remover campo" title="Remover campo">
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <path d="M6.5 1a1 1 0 0 0-1 1v1H2.75a.75.75 0 0 0 0 1.5h.68l.75 8.25A1.5 1.5 0 0 0 5.68 14h4.64a1.5 1.5 0 0 0 1.5-1.25l.75-8.25h.68a.75.75 0 0 0 0-1.5H10.5V2a1 1 0 0 0-1-1h-3zM6 3V2.5h4V3H6zm-1.37 2.5h6.74l-.67 7.38a.25.25 0 0 1-.25.22H5.55a.25.25 0 0 1-.25-.22L4.63 5.5z"/>
+          </svg>
+        </button>
       `;
       row.querySelector(".remove-message-btn").addEventListener("click", () => {
         if (messageList.children.length === 1) {
