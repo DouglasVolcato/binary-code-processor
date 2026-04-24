@@ -8,16 +8,63 @@ package graphql
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+	"github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases"
 )
 
 // SendTask is the resolver for the sendTask field.
 func (r *mutationResolver) SendTask(ctx context.Context, messages []string) ([]*Task, error) {
-	panic(fmt.Errorf("not implemented: SendTask - sendTask"))
+	_ = ctx
+	cleanedMessages := make([]string, 0, len(messages))
+	for _, message := range messages {
+		if strings.TrimSpace(message) == "" {
+			return nil, fmt.Errorf("messages cannot contain empty values")
+		}
+		cleanedMessages = append(cleanedMessages, strings.TrimSpace(message))
+	}
+	if len(cleanedMessages) == 0 {
+		return nil, fmt.Errorf("messages cannot be empty")
+	}
+
+	output, err := r.SendTaskToProcessUseCase.Execute(&usecases.SendTaskToProcessInput{
+		Messages: cleanedMessages,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return mapTasks(output.Tasks), nil
 }
 
 // Tasks is the resolver for the tasks field.
 func (r *queryResolver) Tasks(ctx context.Context, limit *int, offset *int) ([]*Task, error) {
-	panic(fmt.Errorf("not implemented: Tasks - tasks"))
+	_ = ctx
+	limitValue := 100
+	offsetValue := 0
+	if limit != nil {
+		limitValue = *limit
+	}
+	if offset != nil {
+		offsetValue = *offset
+	}
+	if limitValue <= 0 {
+		return nil, fmt.Errorf("limit must be greater than zero")
+	}
+	if offsetValue < 0 {
+		return nil, fmt.Errorf("offset cannot be negative")
+	}
+
+	output, err := r.GetTasksUseCase.Execute(&usecases.GetTasksInput{
+		Limit:  limitValue,
+		Offset: offsetValue,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return mapTasks(output.Tasks), nil
 }
 
 // Mutation returns MutationResolver implementation.
@@ -28,3 +75,21 @@ func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
+
+func mapTasks(tasks []entities.Task) []*Task {
+	mapped := make([]*Task, 0, len(tasks))
+	for _, task := range tasks {
+		mapped = append(mapped, mapTask(task))
+	}
+	return mapped
+}
+
+func mapTask(task entities.Task) *Task {
+	return &Task{
+		ID:         task.ID,
+		Message:    task.Message,
+		BinaryCode: task.BinaryCode,
+		CreatedAt:  task.CreatedAt,
+		UpdatedAt:  task.UpdatedAt,
+	}
+}
