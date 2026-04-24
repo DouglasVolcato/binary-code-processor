@@ -18,10 +18,10 @@ type CreateTaskDTO struct {
 
 type TaskProcessorInterface interface {
 	MoveTaskToProcessing(createTaskDto CreateTaskDTO) (entities.Task, error)
-	SetTaskAsProcessed(taskID string) (entities.Task, error)
+	FinishProcessing(dto FinishProcessingDTO) (entities.Task, error)
 }
 
-type TaskOutboxRepositoryInterface interface {
-	StoreUnprocessedEvent(task entities.Task) error
-	StoreProcessedEvent(task entities.Task) error
+type FinishProcessingDTO struct {
+	ID         string
+	BinaryCode string
 }
