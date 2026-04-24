@@ -24,14 +24,14 @@ import (
 
 const defaultPort = "8080"
 const defaultTaskServiceAddr = "localhost:50051"
-const defaultWebSocketURL = "ws://localhost:8082/ws"
 
 func main() {
 	loadDotEnv()
 
-	port := getenv("PORT", defaultPort)
+	port := getenv("API_GATEWAY_PORT", defaultPort)
 	taskServiceAddr := getenv("TASK_SERVICE_ADDR", defaultTaskServiceAddr)
-	websocketURL := getenv("WEBSOCKET_URL", defaultWebSocketURL)
+	websocketURL := getenv("WEBSOCKET_URL", "")
+	websocketPort := getenv("WEBSOCKET_PORT", "8082")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -56,7 +56,7 @@ func main() {
 	gqlServer.Use(extension.Introspection{})
 	gqlServer.Use(extension.AutomaticPersistedQuery{Cache: lru.New[string](100)})
 
-	home, err := web.NewServer(websocketURL)
+	home, err := web.NewServer(websocketURL, websocketPort)
 	if err != nil {
 		log.Fatal(err)
 	}

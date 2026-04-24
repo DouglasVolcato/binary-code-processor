@@ -12,27 +12,30 @@ var content embed.FS
 type Server struct {
 	tmpl             *template.Template
 	websocketURL     string
+	websocketPort    string
 }
 
 type pageData struct {
-	WebSocketURL string
+	WebSocketURL  string
+	WebSocketPort string
 }
 
-func NewServer(websocketURL string) (*Server, error) {
+func NewServer(websocketURL string, websocketPort string) (*Server, error) {
 	tmpl, err := template.ParseFS(content, "index.html")
 	if err != nil {
 		return nil, err
 	}
 
 	return &Server{
-		tmpl:         tmpl,
-		websocketURL: websocketURL,
+		tmpl:          tmpl,
+		websocketURL:  websocketURL,
+		websocketPort: websocketPort,
 	}, nil
 }
 
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tmpl.Execute(w, pageData{WebSocketURL: s.websocketURL}); err != nil {
+	if err := s.tmpl.Execute(w, pageData{WebSocketURL: s.websocketURL, WebSocketPort: s.websocketPort}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

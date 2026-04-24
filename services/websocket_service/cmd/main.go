@@ -31,41 +31,21 @@ func main() {
 	rabbitURL := getenv("RABBITMQ_URL", defaultRabbitURL)
 	queueName := getenv("WEBSOCKET_QUEUE", defaultQueueName)
 	exchangeName := getenv("WEBSOCKET_EXCHANGE", defaultExchangeName)
-	port := getenv("PORT", defaultPort)
+	port := getenv("WEBSOCKET_PORT", defaultPort)
 
 	hub := ws.NewHub()
 	usecase := usecases.NewSendProcessedTasksUseCase(hub)
 
-	consumer, err := queue.NewConsumer(rabbitURL)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer consumer.Close()
-
-	if err := consumer.DeclareQueue(queueName); err != nil {
-		log.Fatal(err)
-	}
-	if err := consumer.DeclareExchange(exchangeName, "fanout"); err != nil {
-		log.Fatal(err)
-	}
-	if err := consumer.BindQueueToExchange(queueName, exchangeName); err != nil {
-		log.Fatal(err)
-	}
-	if err := consumer.Consume(queueName, func(payload []byte) error {
-		var msg eventMessage
-		if err := json.Unmarshal(payload, &msg); err != nil {
-			return err
+	go func() {
+		for {
+			if err := runBrokerConsumer(rabbitURL, queueName, exchangeName, usecase); err != nil {
+				log.Printf("websocket broker loop: %v", err)
+				time.Sleep(3 * time.Second)
+				continue
+			}
+			return
 		}
-		_, err := usecase.Execute(&usecases.SendProcessedTasksInput{
-			Task: entities.Task{
-				ID:         strings.TrimSpace(msg.ID),
-				BinaryCode: strings.TrimSpace(msg.BinaryCode),
-			},
-		})
-		return err
-	}); err != nil {
-		log.Fatal(err)
-	}
+	}()
 
 	mux := http.NewServeMux()
 	mux.Handle("/ws", hub)
@@ -83,6 +63,41 @@ func main() {
 
 	log.Printf("websocket service listening on :%s", port)
 	log.Fatal(server.ListenAndServe())
+}
+
+func runBrokerConsumer(rabbitURL, queueName, exchangeName string, usecase *usecases.SendProcessedTasksUseCase) error {
+	consumer, err := queue.NewConsumer(rabbitURL)
+	if err != nil {
+		return err
+	}
+	defer consumer.Close()
+
+	if err := consumer.DeclareQueue(queueName); err != nil {
+		return err
+	}
+	if err := consumer.DeclareExchange(exchangeName, "fanout"); err != nil {
+		return err
+	}
+	if err := consumer.BindQueueToExchange(queueName, exchangeName); err != nil {
+		return err
+	}
+	if err := consumer.Consume(queueName, func(payload []byte) error {
+		var msg eventMessage
+		if err := json.Unmarshal(payload, &msg); err != nil {
+			return err
+		}
+		_, err := usecase.Execute(&usecases.SendProcessedTasksInput{
+			Task: entities.Task{
+				ID:         strings.TrimSpace(msg.ID),
+				BinaryCode: strings.TrimSpace(msg.BinaryCode),
+			},
+		})
+		return err
+	}); err != nil {
+		return err
+	}
+
+	select {}
 }
 
 func loadDotEnv() {
