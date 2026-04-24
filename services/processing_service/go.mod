@@ -4,6 +4,7 @@ go 1.25.1
 
 require (
 	github.com/go-faker/faker/v4 v4.7.0
+	github.com/rabbitmq/amqp091-go v1.11.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/grpc v1.80.0
 	google.golang.org/protobuf v1.36.11
