@@ -29,6 +29,7 @@ func (r *mutationResolver) SendTask(ctx context.Context, messages []string) ([]*
 	}
 
 	output, err := r.SendTaskToProcessUseCase.Execute(&usecases.SendTaskToProcessInput{
+		Ctx:      ctx,
 		Messages: cleanedMessages,
 	})
 	if err != nil {
@@ -57,6 +58,7 @@ func (r *queryResolver) Tasks(ctx context.Context, limit *int, offset *int) ([]*
 	}
 
 	output, err := r.GetTasksUseCase.Execute(&usecases.GetTasksInput{
+		Ctx:    ctx,
 		Limit:  limitValue,
 		Offset: offsetValue,
 	})

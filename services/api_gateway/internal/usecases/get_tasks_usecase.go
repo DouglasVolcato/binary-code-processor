@@ -1,6 +1,10 @@
 package usecases
 
-import "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+import (
+	"context"
+
+	"github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+)
 
 type GetTasksUseCase struct {
 	Repo TaskRepositoryInterface
@@ -13,6 +17,7 @@ func NewGetTasksUseCase(repo TaskRepositoryInterface) *GetTasksUseCase {
 }
 
 type GetTasksInput struct {
+	Ctx    context.Context
 	Limit  int
 	Offset int
 }
@@ -25,7 +30,11 @@ func (u *GetTasksUseCase) Execute(input *GetTasksInput) (*GetTasksOutput, error)
 	if input.Limit <= 0 || input.Limit > 20 {
 		input.Limit = 20
 	}
-	tasks, err := u.Repo.GetTasks(input.Limit, input.Offset)
+	ctx := input.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	tasks, err := u.Repo.GetTasks(ctx, input.Limit, input.Offset)
 	if err != nil {
 		return nil, err
 	}

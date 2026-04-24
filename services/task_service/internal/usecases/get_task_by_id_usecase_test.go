@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -14,20 +15,22 @@ type mockRepoForGetByID struct {
 	GetTaskByIDArgs  struct {
 		TaskID string
 	}
-	GetTaskByIDFunc func(taskID string) (entities.Task, error)
+	GetTaskByIDFunc func(ctx context.Context, taskID string) (entities.Task, error)
 	GetTasksCalls   int
 }
 
-func (m *mockRepoForGetByID) GetTasks(limit int, offset int) ([]entities.Task, error) {
+func (m *mockRepoForGetByID) GetTasks(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
+	_ = ctx
 	m.GetTasksCalls++
 	return nil, nil
 }
 
-func (m *mockRepoForGetByID) GetTaskByID(taskID string) (entities.Task, error) {
+func (m *mockRepoForGetByID) GetTaskByID(ctx context.Context, taskID string) (entities.Task, error) {
+	_ = ctx
 	m.GetTaskByIDCalls++
 	m.GetTaskByIDArgs.TaskID = taskID
 	if m.GetTaskByIDFunc != nil {
-		return m.GetTaskByIDFunc(taskID)
+		return m.GetTaskByIDFunc(ctx, taskID)
 	}
 	return entities.Task{}, nil
 }
@@ -54,13 +57,13 @@ func TestNewGetTaskByIDUseCaseShouldCreateGetTaskByIDUseCase(t *testing.T) {
 func TestGetTaskByIDExecuteShouldReturnTask(t *testing.T) {
 	task := makeFakeTask()
 	repo := &mockRepoForGetByID{
-		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
+		GetTaskByIDFunc: func(ctx context.Context, taskID string) (entities.Task, error) {
 			return task, nil
 		},
 	}
 	sut := NewGetTaskByIDUseCase(repo)
 
-	input := &GetTaskByIDInput{ID: task.ID}
+	input := &GetTaskByIDInput{Ctx: context.Background(), ID: task.ID}
 	output, err := sut.Execute(input)
 
 	assert.NoError(t, err)
@@ -74,13 +77,13 @@ func TestGetTaskByIDExecuteShouldReturnTask(t *testing.T) {
 func TestGetTaskByIDExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedErr := errors.New("not found")
 	repo := &mockRepoForGetByID{
-		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
+		GetTaskByIDFunc: func(ctx context.Context, taskID string) (entities.Task, error) {
 			return entities.Task{}, expectedErr
 		},
 	}
 	sut := NewGetTaskByIDUseCase(repo)
 
-	input := &GetTaskByIDInput{ID: "missing"}
+	input := &GetTaskByIDInput{Ctx: context.Background(), ID: "missing"}
 	output, err := sut.Execute(input)
 
 	assert.Nil(t, output)

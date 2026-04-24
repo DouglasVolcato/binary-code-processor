@@ -26,8 +26,9 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{DB: db}
 }
 
-func (r *Repository) GetTasks(limit int, offset int) ([]entities.Task, error) {
-	rows, err := r.DB.Query(
+func (r *Repository) GetTasks(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
+	rows, err := r.DB.QueryContext(
+		ctx,
 		fmt.Sprintf(`
 			SELECT id, message, binary_code, created_at, updated_at
 			FROM %s
@@ -56,8 +57,9 @@ func (r *Repository) GetTasks(limit int, offset int) ([]entities.Task, error) {
 	return tasks, nil
 }
 
-func (r *Repository) GetTaskByID(taskID string) (entities.Task, error) {
-	row := r.DB.QueryRow(
+func (r *Repository) GetTaskByID(ctx context.Context, taskID string) (entities.Task, error) {
+	row := r.DB.QueryRowContext(
+		ctx,
 		fmt.Sprintf(`
 			SELECT id, message, binary_code, created_at, updated_at
 			FROM %s
@@ -68,8 +70,8 @@ func (r *Repository) GetTaskByID(taskID string) (entities.Task, error) {
 	return scanTaskRow(row)
 }
 
-func (r *Repository) MoveTaskToProcessing(createTaskDto usecases.CreateTaskDTO) (entities.Task, error) {
-	tx, err := r.DB.BeginTx(context.Background(), nil)
+func (r *Repository) MoveTaskToProcessing(ctx context.Context, createTaskDto usecases.CreateTaskDTO) (entities.Task, error) {
+	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return entities.Task{}, err
 	}
@@ -102,8 +104,8 @@ func (r *Repository) MoveTaskToProcessing(createTaskDto usecases.CreateTaskDTO) 
 	return task, nil
 }
 
-func (r *Repository) FinishProcessing(dto usecases.FinishProcessingDTO) (entities.Task, error) {
-	tx, err := r.DB.BeginTx(context.Background(), nil)
+func (r *Repository) FinishProcessing(ctx context.Context, dto usecases.FinishProcessingDTO) (entities.Task, error) {
+	tx, err := r.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return entities.Task{}, err
 	}

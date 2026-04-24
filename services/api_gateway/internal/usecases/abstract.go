@@ -1,11 +1,15 @@
 package usecases
 
-import "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+import (
+	"context"
+
+	"github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+)
 
 type TaskRepositoryInterface interface {
-	GetTasks(limit int, offset int) ([]entities.Task, error)
+	GetTasks(ctx context.Context, limit int, offset int) ([]entities.Task, error)
 }
 
 type TaskProcessorInterface interface {
-	SendTaskToProcess(messages []string) ([]entities.Task, error)
+	SendTaskToProcess(ctx context.Context, messages []string) ([]entities.Task, error)
 }

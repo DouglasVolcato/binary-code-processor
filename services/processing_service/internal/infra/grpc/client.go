@@ -62,10 +62,10 @@ func NewClient(conn *grpc.ClientConn) *Client {
 	return &Client{conn: conn}
 }
 
-func (c *Client) GetTaskByID(taskID string) (entities.Task, error) {
+func (c *Client) GetTaskByID(ctx context.Context, taskID string) (entities.Task, error) {
 	out := new(TaskByIDResponse)
 	if err := c.conn.Invoke(
-		context.Background(),
+		ctx,
 		"/task.TaskService/GetTaskByID",
 		&TaskByIDRequest{ID: taskID},
 		out,
@@ -83,9 +83,9 @@ func (c *Client) GetTaskByID(taskID string) (entities.Task, error) {
 	}, nil
 }
 
-func (c *Client) FinishProcessing(dto usecases.FinishProcessingDTO) error {
+func (c *Client) FinishProcessing(ctx context.Context, dto usecases.FinishProcessingDTO) error {
 	stream, err := c.conn.NewStream(
-		context.Background(),
+		ctx,
 		&grpc.StreamDesc{StreamName: "SendProcessedTask", ClientStreams: true},
 		"/task.TaskService/SendProcessedTask",
 		grpc.ForceCodec(jsonCodec{}),

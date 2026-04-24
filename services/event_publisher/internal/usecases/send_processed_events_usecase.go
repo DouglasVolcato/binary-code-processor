@@ -32,6 +32,9 @@ func (u *SendProcessedEventsUseCase) Execute(input *SendProcessedEventsInput) (*
 		if err := u.Processor.SendFanoutEvent(event); err != nil {
 			return nil, err
 		}
+		if err := u.Repo.DeleteEventByID(event.ID); err != nil {
+			return nil, err
+		}
 	}
 	return &SendProcessedEventsOutput{}, nil
 }

@@ -57,3 +57,13 @@ func (r *Repository) getEventsByStatus(status string, limit int, offset int) ([]
 	return events, nil
 }
 
+func (r *Repository) DeleteEventByID(id string) error {
+	_, err := r.DB.Exec(
+		fmt.Sprintf(`
+			DELETE FROM %s
+			WHERE task_id = $1
+		`, outboxTable),
+		id,
+	)
+	return err
+}

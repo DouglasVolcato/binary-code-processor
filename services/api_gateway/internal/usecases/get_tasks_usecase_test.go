@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -15,15 +16,16 @@ type mockTaskRepository struct {
 		Limit  int
 		Offset int
 	}
-	GetTasksFunc func(limit int, offset int) ([]entities.Task, error)
+	GetTasksFunc func(ctx context.Context, limit int, offset int) ([]entities.Task, error)
 }
 
-func (m *mockTaskRepository) GetTasks(limit int, offset int) ([]entities.Task, error) {
+func (m *mockTaskRepository) GetTasks(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
+	_ = ctx
 	m.GetTasksCalls++
 	m.GetTasksArgs.Limit = limit
 	m.GetTasksArgs.Offset = offset
 	if m.GetTasksFunc != nil {
-		return m.GetTasksFunc(limit, offset)
+		return m.GetTasksFunc(ctx, limit, offset)
 	}
 	return nil, nil
 }
@@ -59,13 +61,14 @@ func TestGetTasksExecuteShouldReturnTasks(t *testing.T) {
 	expectedTasks := makeFakeTasks(2)
 
 	repo := &mockTaskRepository{
-		GetTasksFunc: func(limit int, offset int) ([]entities.Task, error) {
+		GetTasksFunc: func(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
 			return expectedTasks, nil
 		},
 	}
 	sut := NewGetTasksUseCase(repo)
 
 	input := &GetTasksInput{
+		Ctx:    context.Background(),
 		Limit:  10,
 		Offset: 5,
 	}
@@ -84,13 +87,14 @@ func TestGetTasksExecuteShouldUseDefaultLimitWhenInputLimitIsZero(t *testing.T) 
 	expectedTasks := makeFakeTasks(1)
 
 	repo := &mockTaskRepository{
-		GetTasksFunc: func(limit int, offset int) ([]entities.Task, error) {
+		GetTasksFunc: func(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
 			return expectedTasks, nil
 		},
 	}
 	sut := NewGetTasksUseCase(repo)
 
 	input := &GetTasksInput{
+		Ctx:    context.Background(),
 		Limit:  0,
 		Offset: 3,
 	}
@@ -110,13 +114,14 @@ func TestGetTasksExecuteShouldUseDefaultLimitWhenInputLimitIsGreaterThanMaximum(
 	expectedTasks := makeFakeTasks(1)
 
 	repo := &mockTaskRepository{
-		GetTasksFunc: func(limit int, offset int) ([]entities.Task, error) {
+		GetTasksFunc: func(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
 			return expectedTasks, nil
 		},
 	}
 	sut := NewGetTasksUseCase(repo)
 
 	input := &GetTasksInput{
+		Ctx:    context.Background(),
 		Limit:  999,
 		Offset: 7,
 	}
@@ -135,13 +140,14 @@ func TestGetTasksExecuteShouldUseDefaultLimitWhenInputLimitIsGreaterThanMaximum(
 func TestGetTasksExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedError := errors.New("repo failure")
 	repo := &mockTaskRepository{
-		GetTasksFunc: func(limit int, offset int) ([]entities.Task, error) {
+		GetTasksFunc: func(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
 			return nil, expectedError
 		},
 	}
 	sut := NewGetTasksUseCase(repo)
 
 	input := &GetTasksInput{
+		Ctx:    context.Background(),
 		Limit:  5,
 		Offset: 1,
 	}

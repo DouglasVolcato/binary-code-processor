@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
@@ -19,7 +20,8 @@ func NewProcessTaskUseCase(repo TaskRepositoryInterface, processor TaskProcessor
 }
 
 type ProcessTaskInput struct {
-	ID string
+	Ctx context.Context
+	ID  string
 }
 
 type ProcessTaskOutput struct {
@@ -28,7 +30,12 @@ type ProcessTaskOutput struct {
 }
 
 func (u *ProcessTaskUseCase) Execute(input *ProcessTaskInput) (*ProcessTaskOutput, error) {
-	task, err := u.Repo.GetTaskByID(input.ID)
+	ctx := input.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	task, err := u.Repo.GetTaskByID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -36,7 +43,7 @@ func (u *ProcessTaskUseCase) Execute(input *ProcessTaskInput) (*ProcessTaskOutpu
 	if err != nil {
 		return nil, err
 	}
-	err = u.Processor.FinishProcessing(FinishProcessingDTO{
+	err = u.Processor.FinishProcessing(ctx, FinishProcessingDTO{
 		ID:         task.ID,
 		BinaryCode: binaryCode,
 	})

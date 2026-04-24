@@ -117,6 +117,7 @@ func RegisterTaskAPIServer(s grpc.ServiceRegistrar, srv *Server) {
 func taskServiceReceiveTaskHandler(srv interface{}, stream grpc.ServerStream) error {
 	server := srv.(*Server)
 	var tasks []TaskRecord
+	ctx := stream.Context()
 
 	for {
 		req := new(ReceiveTaskRequest)
@@ -128,6 +129,7 @@ func taskServiceReceiveTaskHandler(srv interface{}, stream grpc.ServerStream) er
 		}
 
 		output, err := server.ReceiveTaskToProcessUseCase.Execute(&usecases.ReceiveTaskToProcessInput{
+			Ctx:     ctx,
 			Message: req.Message,
 		})
 		if err != nil {
@@ -143,6 +145,7 @@ func taskServiceReceiveTaskHandler(srv interface{}, stream grpc.ServerStream) er
 func taskServiceSendProcessedTaskHandler(srv interface{}, stream grpc.ServerStream) error {
 	server := srv.(*Server)
 	success := true
+	ctx := stream.Context()
 
 	for {
 		req := new(ProcessedTaskRequest)
@@ -154,6 +157,7 @@ func taskServiceSendProcessedTaskHandler(srv interface{}, stream grpc.ServerStre
 		}
 
 		_, err := server.ReceiveProcessedTaskUseCase.Execute(&usecases.ReceiveProcessedTaskInput{
+			Ctx:        ctx,
 			ID:         req.ID,
 			BinaryCode: req.BinaryCode,
 		})
@@ -173,6 +177,7 @@ func taskServiceGetTasksHandler(srv interface{}, ctx context.Context, dec func(i
 
 	if interceptor == nil {
 		output, err := srv.(*Server).GetTasksUseCase.Execute(&usecases.GetTasksInput{
+			Ctx:    ctx,
 			Limit:  in.Limit,
 			Offset: in.Offset,
 		})
@@ -188,6 +193,7 @@ func taskServiceGetTasksHandler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		output, err := srv.(*Server).GetTasksUseCase.Execute(&usecases.GetTasksInput{
+			Ctx:    ctx,
 			Limit:  req.(*TaskListRequest).Limit,
 			Offset: req.(*TaskListRequest).Offset,
 		})
@@ -207,7 +213,8 @@ func taskServiceGetTaskByIDHandler(srv interface{}, ctx context.Context, dec fun
 
 	if interceptor == nil {
 		output, err := srv.(*Server).GetTaskByIDUseCase.Execute(&usecases.GetTaskByIDInput{
-			ID: in.ID,
+			Ctx: ctx,
+			ID:  in.ID,
 		})
 		if err != nil {
 			return nil, err
@@ -221,7 +228,8 @@ func taskServiceGetTaskByIDHandler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		output, err := srv.(*Server).GetTaskByIDUseCase.Execute(&usecases.GetTaskByIDInput{
-			ID: req.(*TaskByIDRequest).ID,
+			Ctx: ctx,
+			ID:  req.(*TaskByIDRequest).ID,
 		})
 		if err != nil {
 			return nil, err

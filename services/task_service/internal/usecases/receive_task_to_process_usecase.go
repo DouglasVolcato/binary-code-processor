@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"strings"
 
@@ -20,6 +21,7 @@ func NewReceiveTaskToProcessUseCase(repo TaskProcessorInterface, idGen IDGenerat
 }
 
 type ReceiveTaskToProcessInput struct {
+	Ctx     context.Context
 	Message string
 }
 
@@ -33,12 +35,16 @@ func (u *ReceiveTaskToProcessUseCase) Execute(input *ReceiveTaskToProcessInput) 
 	if message == "" {
 		return nil, errors.New("message is empty")
 	}
+	ctx := input.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
 	createTaskDto := CreateTaskDTO{
 		ID:      u.IDGen.GenerateID(),
 		Message: message,
 	}
-	task, err := u.Repo.MoveTaskToProcessing(createTaskDto)
+	task, err := u.Repo.MoveTaskToProcessing(ctx, createTaskDto)
 	if err != nil {
 		return nil, err
 	}

@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"strings"
 )
@@ -16,6 +17,7 @@ func NewReceiveProcessedTaskUseCase(repo TaskProcessorInterface) *ReceiveProcess
 }
 
 type ReceiveProcessedTaskInput struct {
+	Ctx        context.Context
 	ID         string
 	BinaryCode string
 }
@@ -34,7 +36,12 @@ func (u *ReceiveProcessedTaskUseCase) Execute(input *ReceiveProcessedTaskInput) 
 		return nil, errors.New("binary code is empty")
 	}
 
-	_, err := u.Repo.FinishProcessing(FinishProcessingDTO{
+	ctx := input.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	_, err := u.Repo.FinishProcessing(ctx, FinishProcessingDTO{
 		ID:         taskID,
 		BinaryCode: binaryCode,
 	})

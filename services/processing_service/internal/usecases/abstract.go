@@ -1,9 +1,13 @@
 package usecases
 
-import "github.com/douglasvolcato/binary-code-processor/processing_service/internal/entities"
+import (
+	"context"
+
+	"github.com/douglasvolcato/binary-code-processor/processing_service/internal/entities"
+)
 
 type TaskRepositoryInterface interface {
-	GetTaskByID(taskID string) (entities.Task, error)
+	GetTaskByID(ctx context.Context, taskID string) (entities.Task, error)
 }
 
 type FinishProcessingDTO struct {
@@ -12,5 +16,5 @@ type FinishProcessingDTO struct {
 }
 
 type TaskProcessorInterface interface {
-	FinishProcessing(dto FinishProcessingDTO) error
+	FinishProcessing(ctx context.Context, dto FinishProcessingDTO) error
 }

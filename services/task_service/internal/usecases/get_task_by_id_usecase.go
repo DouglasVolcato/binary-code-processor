@@ -1,6 +1,10 @@
 package usecases
 
-import "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+import (
+	"context"
+
+	"github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+)
 
 type GetTaskByIDUseCase struct {
 	Repo TaskRepositoryInterface
@@ -13,7 +17,8 @@ func NewGetTaskByIDUseCase(repo TaskRepositoryInterface) *GetTaskByIDUseCase {
 }
 
 type GetTaskByIDInput struct {
-	ID string
+	Ctx context.Context
+	ID  string
 }
 
 type GetTaskByIDOutput struct {
@@ -21,7 +26,11 @@ type GetTaskByIDOutput struct {
 }
 
 func (u *GetTaskByIDUseCase) Execute(input *GetTaskByIDInput) (*GetTaskByIDOutput, error) {
-	task, err := u.Repo.GetTaskByID(input.ID)
+	ctx := input.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	task, err := u.Repo.GetTaskByID(ctx, input.ID)
 	if err != nil {
 		return nil, err
 	}

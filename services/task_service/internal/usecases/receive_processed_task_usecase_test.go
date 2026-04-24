@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -11,28 +12,30 @@ import (
 
 type mockProcessorForReceiveProcessed struct {
 	MoveTaskToProcessingCalls int
-	MoveTaskToProcessingFunc   func(dto CreateTaskDTO) (entities.Task, error)
+	MoveTaskToProcessingFunc  func(ctx context.Context, dto CreateTaskDTO) (entities.Task, error)
 
 	FinishProcessingCalls int
 	FinishProcessingArgs  struct {
 		DTO FinishProcessingDTO
 	}
-	FinishProcessingFunc func(dto FinishProcessingDTO) (entities.Task, error)
+	FinishProcessingFunc func(ctx context.Context, dto FinishProcessingDTO) (entities.Task, error)
 }
 
-func (m *mockProcessorForReceiveProcessed) MoveTaskToProcessing(dto CreateTaskDTO) (entities.Task, error) {
+func (m *mockProcessorForReceiveProcessed) MoveTaskToProcessing(ctx context.Context, dto CreateTaskDTO) (entities.Task, error) {
+	_ = ctx
 	m.MoveTaskToProcessingCalls++
 	if m.MoveTaskToProcessingFunc != nil {
-		return m.MoveTaskToProcessingFunc(dto)
+		return m.MoveTaskToProcessingFunc(ctx, dto)
 	}
 	return entities.Task{}, nil
 }
 
-func (m *mockProcessorForReceiveProcessed) FinishProcessing(dto FinishProcessingDTO) (entities.Task, error) {
+func (m *mockProcessorForReceiveProcessed) FinishProcessing(ctx context.Context, dto FinishProcessingDTO) (entities.Task, error) {
+	_ = ctx
 	m.FinishProcessingCalls++
 	m.FinishProcessingArgs.DTO = dto
 	if m.FinishProcessingFunc != nil {
-		return m.FinishProcessingFunc(dto)
+		return m.FinishProcessingFunc(ctx, dto)
 	}
 	return entities.Task{}, nil
 }
@@ -55,14 +58,14 @@ func TestReceiveProcessedTaskExecuteShouldReturnSuccess(t *testing.T) {
 		UpdatedAt:  faker.Date(),
 	}
 	repo := &mockProcessorForReceiveProcessed{
-		FinishProcessingFunc: func(dto FinishProcessingDTO) (entities.Task, error) {
+		FinishProcessingFunc: func(ctx context.Context, dto FinishProcessingDTO) (entities.Task, error) {
 			task.ID = dto.ID
 			task.BinaryCode = dto.BinaryCode
 			return task, nil
 		},
 	}
 	sut := NewReceiveProcessedTaskUseCase(repo)
-	input := &ReceiveProcessedTaskInput{ID: faker.ID(), BinaryCode: task.BinaryCode}
+	input := &ReceiveProcessedTaskInput{Ctx: context.Background(), ID: faker.ID(), BinaryCode: task.BinaryCode}
 	output, err := sut.Execute(input)
 
 	assert.NoError(t, err)
@@ -78,13 +81,13 @@ func TestReceiveProcessedTaskExecuteShouldReturnErrorWhenRepoFails(t *testing.T)
 	faker := test.FakeData{}
 	expectedErr := errors.New("set processed failure")
 	repo := &mockProcessorForReceiveProcessed{
-		FinishProcessingFunc: func(dto FinishProcessingDTO) (entities.Task, error) {
+		FinishProcessingFunc: func(ctx context.Context, dto FinishProcessingDTO) (entities.Task, error) {
 			return entities.Task{}, expectedErr
 		},
 	}
 	sut := NewReceiveProcessedTaskUseCase(repo)
 
-	input := &ReceiveProcessedTaskInput{ID: faker.ID(), BinaryCode: faker.Phrase()}
+	input := &ReceiveProcessedTaskInput{Ctx: context.Background(), ID: faker.ID(), BinaryCode: faker.Phrase()}
 	output, err := sut.Execute(input)
 
 	assert.Nil(t, output)

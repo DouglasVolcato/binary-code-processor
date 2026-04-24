@@ -1,14 +1,18 @@
 package usecases
 
-import "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+import (
+	"context"
+
+	"github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+)
 
 type IDGeneratorInterface interface {
 	GenerateID() string
 }
 
 type TaskRepositoryInterface interface {
-	GetTasks(limit int, offset int) ([]entities.Task, error)
-	GetTaskByID(taskID string) (entities.Task, error)
+	GetTasks(ctx context.Context, limit int, offset int) ([]entities.Task, error)
+	GetTaskByID(ctx context.Context, taskID string) (entities.Task, error)
 }
 
 type CreateTaskDTO struct {
@@ -17,8 +21,8 @@ type CreateTaskDTO struct {
 }
 
 type TaskProcessorInterface interface {
-	MoveTaskToProcessing(createTaskDto CreateTaskDTO) (entities.Task, error)
-	FinishProcessing(dto FinishProcessingDTO) (entities.Task, error)
+	MoveTaskToProcessing(ctx context.Context, createTaskDto CreateTaskDTO) (entities.Task, error)
+	FinishProcessing(ctx context.Context, dto FinishProcessingDTO) (entities.Task, error)
 }
 
 type FinishProcessingDTO struct {

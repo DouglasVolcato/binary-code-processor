@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -14,14 +15,15 @@ type mockRepo struct {
 	GetTaskByIDArgs  struct {
 		ID string
 	}
-	GetTaskByIDFunc func(taskID string) (entities.Task, error)
+	GetTaskByIDFunc func(ctx context.Context, taskID string) (entities.Task, error)
 }
 
-func (m *mockRepo) GetTaskByID(taskID string) (entities.Task, error) {
+func (m *mockRepo) GetTaskByID(ctx context.Context, taskID string) (entities.Task, error) {
+	_ = ctx
 	m.GetTaskByIDCalls++
 	m.GetTaskByIDArgs.ID = taskID
 	if m.GetTaskByIDFunc != nil {
-		return m.GetTaskByIDFunc(taskID)
+		return m.GetTaskByIDFunc(ctx, taskID)
 	}
 	return entities.Task{}, nil
 }
@@ -31,14 +33,15 @@ type mockProcessor struct {
 	FinishProcessingArgs  struct {
 		DTO FinishProcessingDTO
 	}
-	FinishProcessingFunc func(dto FinishProcessingDTO) error
+	FinishProcessingFunc func(ctx context.Context, dto FinishProcessingDTO) error
 }
 
-func (m *mockProcessor) FinishProcessing(dto FinishProcessingDTO) error {
+func (m *mockProcessor) FinishProcessing(ctx context.Context, dto FinishProcessingDTO) error {
+	_ = ctx
 	m.FinishProcessingCalls++
 	m.FinishProcessingArgs.DTO = dto
 	if m.FinishProcessingFunc != nil {
-		return m.FinishProcessingFunc(dto)
+		return m.FinishProcessingFunc(ctx, dto)
 	}
 	return nil
 }
@@ -68,19 +71,19 @@ func TestProcessTaskExecuteShouldReturnBinaryCode(t *testing.T) {
 	task := makeFakeTask("AB")
 
 	repo := &mockRepo{
-		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
+		GetTaskByIDFunc: func(ctx context.Context, taskID string) (entities.Task, error) {
 			task.ID = taskID
 			return task, nil
 		},
 	}
 	proc := &mockProcessor{
-		FinishProcessingFunc: func(dto FinishProcessingDTO) error {
+		FinishProcessingFunc: func(ctx context.Context, dto FinishProcessingDTO) error {
 			return nil
 		},
 	}
 
 	sut := NewProcessTaskUseCase(repo, proc)
-	input := &ProcessTaskInput{ID: "task-123"}
+	input := &ProcessTaskInput{Ctx: context.Background(), ID: "task-123"}
 	out, err := sut.Execute(input)
 
 	assert.NoError(t, err)
@@ -97,14 +100,14 @@ func TestProcessTaskExecuteShouldReturnBinaryCode(t *testing.T) {
 func TestProcessTaskExecuteShouldReturnErrorWhenGetTaskFails(t *testing.T) {
 	expectedErr := errors.New("not found")
 	repo := &mockRepo{
-		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
+		GetTaskByIDFunc: func(ctx context.Context, taskID string) (entities.Task, error) {
 			return entities.Task{}, expectedErr
 		},
 	}
 	proc := &mockProcessor{}
 
 	sut := NewProcessTaskUseCase(repo, proc)
-	input := &ProcessTaskInput{ID: "task-404"}
+	input := &ProcessTaskInput{Ctx: context.Background(), ID: "task-404"}
 	out, err := sut.Execute(input)
 
 	assert.Nil(t, out)
@@ -117,7 +120,7 @@ func TestProcessTaskExecuteShouldReturnErrorWhenTaskMessageIsEmpty(t *testing.T)
 	task := makeFakeTask("")
 
 	repo := &mockRepo{
-		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
+		GetTaskByIDFunc: func(ctx context.Context, taskID string) (entities.Task, error) {
 			task.ID = taskID
 			return task, nil
 		},
@@ -125,7 +128,7 @@ func TestProcessTaskExecuteShouldReturnErrorWhenTaskMessageIsEmpty(t *testing.T)
 	proc := &mockProcessor{}
 
 	sut := NewProcessTaskUseCase(repo, proc)
-	input := &ProcessTaskInput{ID: "task-empty"}
+	input := &ProcessTaskInput{Ctx: context.Background(), ID: "task-empty"}
 	out, err := sut.Execute(input)
 
 	assert.Nil(t, out)
@@ -140,19 +143,19 @@ func TestProcessTaskExecuteShouldReturnErrorWhenFinishProcessingFails(t *testing
 
 	expectedErr := errors.New("finish failure")
 	repo := &mockRepo{
-		GetTaskByIDFunc: func(taskID string) (entities.Task, error) {
+		GetTaskByIDFunc: func(ctx context.Context, taskID string) (entities.Task, error) {
 			task.ID = taskID
 			return task, nil
 		},
 	}
 	proc := &mockProcessor{
-		FinishProcessingFunc: func(dto FinishProcessingDTO) error {
+		FinishProcessingFunc: func(ctx context.Context, dto FinishProcessingDTO) error {
 			return expectedErr
 		},
 	}
 
 	sut := NewProcessTaskUseCase(repo, proc)
-	input := &ProcessTaskInput{ID: "task-500"}
+	input := &ProcessTaskInput{Ctx: context.Background(), ID: "task-500"}
 	out, err := sut.Execute(input)
 
 	assert.Nil(t, out)

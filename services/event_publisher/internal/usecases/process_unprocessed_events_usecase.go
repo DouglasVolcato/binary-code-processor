@@ -32,6 +32,9 @@ func (u *ProcessUnprocessedEventsUseCase) Execute(input *ProcessUnprocessedEvent
 		if err := u.Processor.SendEventToProcess(event); err != nil {
 			return nil, err
 		}
+		if err := u.Repo.DeleteEventByID(event.ID); err != nil {
+			return nil, err
+		}
 	}
 	return &ProcessUnprocessedEventsOutput{}, nil
 }

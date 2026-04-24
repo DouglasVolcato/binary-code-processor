@@ -60,10 +60,10 @@ func NewClient(conn *grpc.ClientConn) *Client {
 	return &Client{conn: conn}
 }
 
-func (c *Client) GetTasks(limit int, offset int) ([]entities.Task, error) {
+func (c *Client) GetTasks(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
 	out := new(TaskListResponse)
 	if err := c.conn.Invoke(
-		context.Background(),
+		ctx,
 		"/task.TaskService/GetTasks",
 		&TaskListRequest{Limit: limit, Offset: offset},
 		out,
@@ -74,9 +74,9 @@ func (c *Client) GetTasks(limit int, offset int) ([]entities.Task, error) {
 	return mapTasks(out.Tasks), nil
 }
 
-func (c *Client) SendTaskToProcess(messages []string) ([]entities.Task, error) {
+func (c *Client) SendTaskToProcess(ctx context.Context, messages []string) ([]entities.Task, error) {
 	stream, err := c.conn.NewStream(
-		context.Background(),
+		ctx,
 		&grpc.StreamDesc{StreamName: "ReceiveTaskToProcess", ClientStreams: true},
 		"/task.TaskService/ReceiveTaskToProcess",
 		grpc.ForceCodec(jsonCodec{}),

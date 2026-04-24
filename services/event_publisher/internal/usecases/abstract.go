@@ -5,6 +5,7 @@ import "github.com/douglasvolcato/binary-code-processor/event_publisher/internal
 type EventRepositoryInterface interface {
 	GetUnprocessedEvents(limit int, offset int) ([]entities.Event, error)
 	GetProcessedEvents(limit int, offset int) ([]entities.Event, error)
+	DeleteEventByID(id string) error
 }
 
 type EventProcessorInterface interface {

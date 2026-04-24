@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -14,25 +15,27 @@ type mockProcessorForReceive struct {
 	MoveTaskToProcessingArgs  struct {
 		DTO CreateTaskDTO
 	}
-	MoveTaskToProcessingFunc func(dto CreateTaskDTO) (entities.Task, error)
+	MoveTaskToProcessingFunc func(ctx context.Context, dto CreateTaskDTO) (entities.Task, error)
 
 	FinishProcessingCalls int
-	FinishProcessingFunc  func(dto FinishProcessingDTO) (entities.Task, error)
+	FinishProcessingFunc  func(ctx context.Context, dto FinishProcessingDTO) (entities.Task, error)
 }
 
-func (m *mockProcessorForReceive) MoveTaskToProcessing(dto CreateTaskDTO) (entities.Task, error) {
+func (m *mockProcessorForReceive) MoveTaskToProcessing(ctx context.Context, dto CreateTaskDTO) (entities.Task, error) {
+	_ = ctx
 	m.MoveTaskToProcessingCalls++
 	m.MoveTaskToProcessingArgs.DTO = dto
 	if m.MoveTaskToProcessingFunc != nil {
-		return m.MoveTaskToProcessingFunc(dto)
+		return m.MoveTaskToProcessingFunc(ctx, dto)
 	}
 	return entities.Task{}, nil
 }
 
-func (m *mockProcessorForReceive) FinishProcessing(dto FinishProcessingDTO) (entities.Task, error) {
+func (m *mockProcessorForReceive) FinishProcessing(ctx context.Context, dto FinishProcessingDTO) (entities.Task, error) {
+	_ = ctx
 	m.FinishProcessingCalls++
 	if m.FinishProcessingFunc != nil {
-		return m.FinishProcessingFunc(dto)
+		return m.FinishProcessingFunc(ctx, dto)
 	}
 	return entities.Task{}, nil
 }
@@ -74,10 +77,10 @@ func TestNewReceiveTaskToProcessUseCaseShouldCreateReceiveTaskToProcessUseCase(t
 func TestReceiveTaskToProcessExecuteShouldReturnTask(t *testing.T) {
 	faker := test.FakeData{}
 	fakeTask := makeFakeTaskEntity()
-	input := &ReceiveTaskToProcessInput{Message: faker.Phrase()}
+	input := &ReceiveTaskToProcessInput{Ctx: context.Background(), Message: faker.Phrase()}
 
 	proc := &mockProcessorForReceive{
-		MoveTaskToProcessingFunc: func(dto CreateTaskDTO) (entities.Task, error) {
+		MoveTaskToProcessingFunc: func(ctx context.Context, dto CreateTaskDTO) (entities.Task, error) {
 			task := fakeTask
 			task.ID = dto.ID
 			task.Message = dto.Message
@@ -106,14 +109,14 @@ func TestReceiveTaskToProcessExecuteShouldReturnErrorWhenRepoFails(t *testing.T)
 	faker := test.FakeData{}
 	expectedErr := errors.New("move failure")
 	proc := &mockProcessorForReceive{
-		MoveTaskToProcessingFunc: func(dto CreateTaskDTO) (entities.Task, error) {
+		MoveTaskToProcessingFunc: func(ctx context.Context, dto CreateTaskDTO) (entities.Task, error) {
 			return entities.Task{}, expectedErr
 		},
 	}
 	idGen := &mockIDGen{GenerateIDFunc: func() string { return faker.ID() }}
 
 	sut := NewReceiveTaskToProcessUseCase(proc, idGen)
-	input := &ReceiveTaskToProcessInput{Message: faker.Phrase()}
+	input := &ReceiveTaskToProcessInput{Ctx: context.Background(), Message: faker.Phrase()}
 
 	output, err := sut.Execute(input)
 

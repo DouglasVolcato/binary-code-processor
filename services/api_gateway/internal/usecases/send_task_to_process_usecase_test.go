@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -14,14 +15,15 @@ type mockTaskProcessor struct {
 	SendTaskToProcessArgs  struct {
 		Messages []string
 	}
-	SendTaskToProcessFunc func(messages []string) ([]entities.Task, error)
+	SendTaskToProcessFunc func(ctx context.Context, messages []string) ([]entities.Task, error)
 }
 
-func (m *mockTaskProcessor) SendTaskToProcess(messages []string) ([]entities.Task, error) {
+func (m *mockTaskProcessor) SendTaskToProcess(ctx context.Context, messages []string) ([]entities.Task, error) {
+	_ = ctx
 	m.SendTaskToProcessCalls++
 	m.SendTaskToProcessArgs.Messages = messages
 	if m.SendTaskToProcessFunc != nil {
-		return m.SendTaskToProcessFunc(messages)
+		return m.SendTaskToProcessFunc(ctx, messages)
 	}
 	return nil, nil
 }
@@ -62,13 +64,14 @@ func TestSendTaskToProcessExecuteShouldReturnTasks(t *testing.T) {
 	}
 
 	repo := &mockTaskProcessor{
-		SendTaskToProcessFunc: func(messages []string) ([]entities.Task, error) {
+		SendTaskToProcessFunc: func(ctx context.Context, messages []string) ([]entities.Task, error) {
 			return expectedTasks, nil
 		},
 	}
 	sut := NewSendTaskToProcessUseCase(repo)
 
 	input := &SendTaskToProcessInput{
+		Ctx:      context.Background(),
 		Messages: expectedMessages,
 	}
 
@@ -85,13 +88,14 @@ func TestSendTaskToProcessExecuteShouldReturnTasks(t *testing.T) {
 func TestSendTaskToProcessExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedError := errors.New("repo failure")
 	repo := &mockTaskProcessor{
-		SendTaskToProcessFunc: func(messages []string) ([]entities.Task, error) {
+		SendTaskToProcessFunc: func(ctx context.Context, messages []string) ([]entities.Task, error) {
 			return nil, expectedError
 		},
 	}
 	sut := NewSendTaskToProcessUseCase(repo)
 
 	input := &SendTaskToProcessInput{
+		Ctx:      context.Background(),
 		Messages: makeFakeMessages(2),
 	}
 

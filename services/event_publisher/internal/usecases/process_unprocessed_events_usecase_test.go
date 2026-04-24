@@ -23,6 +23,12 @@ type mockEventRepositoryForProcessUnprocessed struct {
 		Offset int
 	}
 	GetProcessedEventsFunc func(limit int, offset int) ([]entities.Event, error)
+
+	DeleteEventByIDCalls int
+	DeleteEventByIDArgs  struct {
+		ID string
+	}
+	DeleteEventByIDFunc func(id string) error
 }
 
 func (m *mockEventRepositoryForProcessUnprocessed) GetUnprocessedEvents(limit int, offset int) ([]entities.Event, error) {
@@ -43,6 +49,15 @@ func (m *mockEventRepositoryForProcessUnprocessed) GetProcessedEvents(limit int,
 		return m.GetProcessedEventsFunc(limit, offset)
 	}
 	return nil, nil
+}
+
+func (m *mockEventRepositoryForProcessUnprocessed) DeleteEventByID(id string) error {
+	m.DeleteEventByIDCalls++
+	m.DeleteEventByIDArgs.ID = id
+	if m.DeleteEventByIDFunc != nil {
+		return m.DeleteEventByIDFunc(id)
+	}
+	return nil
 }
 
 type mockEventProcessorForProcessUnprocessed struct {

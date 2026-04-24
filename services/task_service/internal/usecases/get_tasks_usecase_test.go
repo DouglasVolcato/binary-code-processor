@@ -1,6 +1,7 @@
 package usecases
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -15,29 +16,31 @@ type mockTaskRepository struct {
 		Limit  int
 		Offset int
 	}
-	GetTasksFunc     func(limit int, offset int) ([]entities.Task, error)
+	GetTasksFunc     func(ctx context.Context, limit int, offset int) ([]entities.Task, error)
 	GetTaskByIDCalls int
 	GetTaskByIDArgs  struct {
 		TaskID string
 	}
-	GetTaskByIDFunc func(taskID string) (entities.Task, error)
+	GetTaskByIDFunc func(ctx context.Context, taskID string) (entities.Task, error)
 }
 
-func (m *mockTaskRepository) GetTasks(limit int, offset int) ([]entities.Task, error) {
+func (m *mockTaskRepository) GetTasks(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
+	_ = ctx
 	m.GetTasksCalls++
 	m.GetTasksArgs.Limit = limit
 	m.GetTasksArgs.Offset = offset
 	if m.GetTasksFunc != nil {
-		return m.GetTasksFunc(limit, offset)
+		return m.GetTasksFunc(ctx, limit, offset)
 	}
 	return nil, nil
 }
 
-func (m *mockTaskRepository) GetTaskByID(taskID string) (entities.Task, error) {
+func (m *mockTaskRepository) GetTaskByID(ctx context.Context, taskID string) (entities.Task, error) {
+	_ = ctx
 	m.GetTaskByIDCalls++
 	m.GetTaskByIDArgs.TaskID = taskID
 	if m.GetTaskByIDFunc != nil {
-		return m.GetTaskByIDFunc(taskID)
+		return m.GetTaskByIDFunc(ctx, taskID)
 	}
 	return entities.Task{}, nil
 }
@@ -69,16 +72,13 @@ func TestGetTasksExecuteShouldReturnTasks(t *testing.T) {
 	expectedTasks := makeFakeTasks(2)
 
 	repo := &mockTaskRepository{
-		GetTasksFunc: func(limit int, offset int) ([]entities.Task, error) {
+		GetTasksFunc: func(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
 			return expectedTasks, nil
 		},
 	}
 	sut := NewGetTasksUseCase(repo)
 
-	input := &GetTasksInput{
-		Limit:  10,
-		Offset: 5,
-	}
+	input := &GetTasksInput{Ctx: context.Background(), Limit: 10, Offset: 5}
 
 	output, err := sut.Execute(input)
 
@@ -94,16 +94,13 @@ func TestGetTasksExecuteShouldReturnTasks(t *testing.T) {
 func TestGetTasksExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	expectedError := errors.New("repo failure")
 	repo := &mockTaskRepository{
-		GetTasksFunc: func(limit int, offset int) ([]entities.Task, error) {
+		GetTasksFunc: func(ctx context.Context, limit int, offset int) ([]entities.Task, error) {
 			return nil, expectedError
 		},
 	}
 	sut := NewGetTasksUseCase(repo)
 
-	input := &GetTasksInput{
-		Limit:  5,
-		Offset: 1,
-	}
+	input := &GetTasksInput{Ctx: context.Background(), Limit: 5, Offset: 1}
 
 	output, err := sut.Execute(input)
 
