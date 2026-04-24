@@ -4,7 +4,7 @@
 // - protoc             v3.12.4
 // source: task.proto
 
-package task
+package grpc
 
 import (
 	context "context"
