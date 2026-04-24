@@ -6,8 +6,9 @@ import (
 )
 
 type Event struct {
-	ID     string
-	Status string
+	ID         string
+	Status     string
+	BinaryCode string
 }
 
 func NewEvent(id string, status string) *Event {
