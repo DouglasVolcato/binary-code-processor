@@ -5,7 +5,7 @@ X integração com banco de dados
 X interação com grpc
 X interação com graphql
 X integração com rabbitmq
-- lógica das integrações
+X lógica das integrações
 - servers
 - frontend
 - prometheus e grafana

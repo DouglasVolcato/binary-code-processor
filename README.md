@@ -286,13 +286,13 @@ Method used:
 `Execute(input *ReceiveProcessedTaskInput)`
 
 Boundary method called:
-`TaskProcessorInterface.SetTaskAsProcessed(taskID string)`
+`TaskProcessorInterface.FinishProcessing(dto FinishProcessingDTO)`
 
 Transport used by the adapter:
 `gRPC`
 
 What is sent over gRPC:
-the processed task ID, without `BinaryCode`
+the processed task ID together with `BinaryCode`
 
 What is updated in the database:
 the task row is updated in Postgres to mark it as processed
