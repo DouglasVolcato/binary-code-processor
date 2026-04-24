@@ -3,6 +3,8 @@ package main
 import (
 	"log"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/database"
@@ -15,6 +17,8 @@ const defaultDatabaseURL = "postgres://postgres:postgres@localhost:5432/task_ser
 const defaultRabbitURL = "amqp://guest:guest@localhost:5672/"
 
 func main() {
+	loadDotEnv()
+
 	databaseURL := getenv("DATABASE_URL", defaultDatabaseURL)
 	rabbitURL := getenv("RABBITMQ_URL", defaultRabbitURL)
 
@@ -59,6 +63,35 @@ func main() {
 		}
 		<-ticker.C
 	}
+}
+
+func loadDotEnv() {
+	for _, path := range []string{".env", filepath.Join("..", ".env"), filepath.Join("..", "..", ".env")} {
+		if err := loadEnvFile(path); err == nil {
+			return
+		}
+	}
+}
+
+func loadEnvFile(path string) error {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		_ = os.Setenv(strings.TrimSpace(key), strings.Trim(strings.TrimSpace(value), `"'`))
+	}
+
+	return nil
 }
 
 func getenv(key string, fallback string) string {
