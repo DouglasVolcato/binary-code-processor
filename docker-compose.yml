@@ -1,0 +1,108 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-task_service}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-task_service}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  task_service:
+    build:
+      context: ./services/task_service
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/task_service?sslmode=disable}
+      GRPC_PORT: ${GRPC_PORT:-50051}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "50051:50051"
+
+  processing_service:
+    build:
+      context: ./services/processing_service
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      TASK_SERVICE_ADDR: ${TASK_SERVICE_ADDR:-task_service:50051}
+      PROCESS_QUEUE: ${PROCESS_QUEUE:-task.process}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      task_service:
+        condition: service_started
+
+  event_publisher:
+    build:
+      context: ./services/event_publisher
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://postgres:postgres@postgres:5432/task_service?sslmode=disable}
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-5s}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+
+  websocket_service:
+    build:
+      context: ./services/websocket_service
+    env_file:
+      - .env
+    environment:
+      RABBITMQ_URL: ${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      WEBSOCKET_QUEUE: ${WEBSOCKET_QUEUE:-task.websocket}
+      WEBSOCKET_EXCHANGE: ${WEBSOCKET_EXCHANGE:-task.processed}
+      PORT: ${PORT:-8082}
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "8082:8082"
+
+  api_gateway:
+    build:
+      context: ./services/api_gateway
+    env_file:
+      - .env
+    environment:
+      TASK_SERVICE_ADDR: ${TASK_SERVICE_ADDR:-task_service:50051}
+      PORT: ${PORT:-8080}
+      WEBSOCKET_URL: ${WEBSOCKET_URL:-ws://localhost:8082/ws}
+    depends_on:
+      task_service:
+        condition: service_started
+      websocket_service:
+        condition: service_started
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres-data:
