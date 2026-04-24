@@ -16,19 +16,8 @@ type mockProcessorForReceive struct {
 	}
 	MoveTaskToProcessingFunc func(dto CreateTaskDTO) (entities.Task, error)
 
-	SetTaskAsProcessedCalls int
-	SetTaskAsProcessedFunc  func(taskID string) (entities.Task, error)
-}
-
-type mockOutboxForReceive struct {
-	StoreUnprocessedEventCalls int
-	StoreUnprocessedEventArgs  struct {
-		Task entities.Task
-	}
-	StoreUnprocessedEventFunc func(task entities.Task) error
-
-	StoreProcessedEventCalls int
-	StoreProcessedEventFunc  func(task entities.Task) error
+	FinishProcessingCalls int
+	FinishProcessingFunc  func(dto FinishProcessingDTO) (entities.Task, error)
 }
 
 func (m *mockProcessorForReceive) MoveTaskToProcessing(dto CreateTaskDTO) (entities.Task, error) {
@@ -40,29 +29,12 @@ func (m *mockProcessorForReceive) MoveTaskToProcessing(dto CreateTaskDTO) (entit
 	return entities.Task{}, nil
 }
 
-func (m *mockProcessorForReceive) SetTaskAsProcessed(taskID string) (entities.Task, error) {
-	m.SetTaskAsProcessedCalls++
-	if m.SetTaskAsProcessedFunc != nil {
-		return m.SetTaskAsProcessedFunc(taskID)
+func (m *mockProcessorForReceive) FinishProcessing(dto FinishProcessingDTO) (entities.Task, error) {
+	m.FinishProcessingCalls++
+	if m.FinishProcessingFunc != nil {
+		return m.FinishProcessingFunc(dto)
 	}
 	return entities.Task{}, nil
-}
-
-func (m *mockOutboxForReceive) StoreUnprocessedEvent(task entities.Task) error {
-	m.StoreUnprocessedEventCalls++
-	m.StoreUnprocessedEventArgs.Task = task
-	if m.StoreUnprocessedEventFunc != nil {
-		return m.StoreUnprocessedEventFunc(task)
-	}
-	return nil
-}
-
-func (m *mockOutboxForReceive) StoreProcessedEvent(task entities.Task) error {
-	m.StoreProcessedEventCalls++
-	if m.StoreProcessedEventFunc != nil {
-		return m.StoreProcessedEventFunc(task)
-	}
-	return nil
 }
 
 type mockIDGen struct {
@@ -91,13 +63,11 @@ func makeFakeTaskEntity() entities.Task {
 
 func TestNewReceiveTaskToProcessUseCaseShouldCreateReceiveTaskToProcessUseCase(t *testing.T) {
 	proc := &mockProcessorForReceive{}
-	outbox := &mockOutboxForReceive{}
 	idGen := &mockIDGen{}
-	sut := NewReceiveTaskToProcessUseCase(proc, outbox, idGen)
+	sut := NewReceiveTaskToProcessUseCase(proc, idGen)
 
 	assert.NotNil(t, sut)
 	assert.Same(t, proc, sut.Repo)
-	assert.Same(t, outbox, sut.Outbox)
 	assert.Same(t, idGen, sut.IDGen)
 }
 
@@ -114,10 +84,9 @@ func TestReceiveTaskToProcessExecuteShouldReturnTask(t *testing.T) {
 			return task, nil
 		},
 	}
-	outbox := &mockOutboxForReceive{}
 	idGen := &mockIDGen{GenerateIDFunc: func() string { return fakeTask.ID }}
 
-	sut := NewReceiveTaskToProcessUseCase(proc, outbox, idGen)
+	sut := NewReceiveTaskToProcessUseCase(proc, idGen)
 
 	output, err := sut.Execute(input)
 
@@ -129,13 +98,8 @@ func TestReceiveTaskToProcessExecuteShouldReturnTask(t *testing.T) {
 	assert.Equal(t, 1, proc.MoveTaskToProcessingCalls)
 	assert.Equal(t, fakeTask.ID, proc.MoveTaskToProcessingArgs.DTO.ID)
 	assert.Equal(t, input.Message, proc.MoveTaskToProcessingArgs.DTO.Message)
-	assert.Equal(t, 1, outbox.StoreUnprocessedEventCalls)
-	assert.Equal(t, fakeTask.ID, outbox.StoreUnprocessedEventArgs.Task.ID)
-	assert.Equal(t, input.Message, outbox.StoreUnprocessedEventArgs.Task.Message)
-	assert.Equal(t, "", outbox.StoreUnprocessedEventArgs.Task.BinaryCode)
 	assert.Equal(t, 1, idGen.GenerateIDCalls)
-	assert.Equal(t, 0, proc.SetTaskAsProcessedCalls)
-	assert.Equal(t, 0, outbox.StoreProcessedEventCalls)
+	assert.Equal(t, 0, proc.FinishProcessingCalls)
 }
 
 func TestReceiveTaskToProcessExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
@@ -146,10 +110,9 @@ func TestReceiveTaskToProcessExecuteShouldReturnErrorWhenRepoFails(t *testing.T)
 			return entities.Task{}, expectedErr
 		},
 	}
-	outbox := &mockOutboxForReceive{}
 	idGen := &mockIDGen{GenerateIDFunc: func() string { return faker.ID() }}
 
-	sut := NewReceiveTaskToProcessUseCase(proc, outbox, idGen)
+	sut := NewReceiveTaskToProcessUseCase(proc, idGen)
 	input := &ReceiveTaskToProcessInput{Message: faker.Phrase()}
 
 	output, err := sut.Execute(input)
@@ -159,8 +122,6 @@ func TestReceiveTaskToProcessExecuteShouldReturnErrorWhenRepoFails(t *testing.T)
 	assert.Equal(t, 1, proc.MoveTaskToProcessingCalls)
 	assert.Equal(t, input.Message, proc.MoveTaskToProcessingArgs.DTO.Message)
 	assert.NotEmpty(t, proc.MoveTaskToProcessingArgs.DTO.ID)
-	assert.Equal(t, 0, outbox.StoreUnprocessedEventCalls)
-	assert.Equal(t, 0, outbox.StoreProcessedEventCalls)
 	assert.Equal(t, 1, idGen.GenerateIDCalls)
-	assert.Equal(t, 0, proc.SetTaskAsProcessedCalls)
+	assert.Equal(t, 0, proc.FinishProcessingCalls)
 }

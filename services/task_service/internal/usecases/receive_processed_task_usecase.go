@@ -1,19 +1,23 @@
 package usecases
 
+import (
+	"errors"
+	"strings"
+)
+
 type ReceiveProcessedTaskUseCase struct {
-	Repo   TaskProcessorInterface
-	Outbox TaskOutboxRepositoryInterface
+	Repo TaskProcessorInterface
 }
 
-func NewReceiveProcessedTaskUseCase(repo TaskProcessorInterface, outbox TaskOutboxRepositoryInterface) *ReceiveProcessedTaskUseCase {
+func NewReceiveProcessedTaskUseCase(repo TaskProcessorInterface) *ReceiveProcessedTaskUseCase {
 	return &ReceiveProcessedTaskUseCase{
-		Repo:   repo,
-		Outbox: outbox,
+		Repo: repo,
 	}
 }
 
 type ReceiveProcessedTaskInput struct {
-	ID string
+	ID         string
+	BinaryCode string
 }
 
 type ReceiveProcessedTaskOutput struct {
@@ -21,11 +25,20 @@ type ReceiveProcessedTaskOutput struct {
 }
 
 func (u *ReceiveProcessedTaskUseCase) Execute(input *ReceiveProcessedTaskInput) (*ReceiveProcessedTaskOutput, error) {
-	task, err := u.Repo.SetTaskAsProcessed(input.ID)
-	if err != nil {
-		return nil, err
+	taskID := strings.TrimSpace(input.ID)
+	binaryCode := strings.TrimSpace(input.BinaryCode)
+	if taskID == "" {
+		return nil, errors.New("task id is empty")
 	}
-	if err := u.Outbox.StoreProcessedEvent(task); err != nil {
+	if binaryCode == "" {
+		return nil, errors.New("binary code is empty")
+	}
+
+	_, err := u.Repo.FinishProcessing(FinishProcessingDTO{
+		ID:         taskID,
+		BinaryCode: binaryCode,
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &ReceiveProcessedTaskOutput{

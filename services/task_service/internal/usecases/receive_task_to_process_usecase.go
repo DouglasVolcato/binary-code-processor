@@ -1,18 +1,21 @@
 package usecases
 
-import "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+import (
+	"errors"
+	"strings"
+
+	"github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+)
 
 type ReceiveTaskToProcessUseCase struct {
-	Repo     TaskProcessorInterface
-	Outbox   TaskOutboxRepositoryInterface
-	IDGen    IDGeneratorInterface
+	Repo  TaskProcessorInterface
+	IDGen IDGeneratorInterface
 }
 
-func NewReceiveTaskToProcessUseCase(repo TaskProcessorInterface, outbox TaskOutboxRepositoryInterface, idGen IDGeneratorInterface) *ReceiveTaskToProcessUseCase {
+func NewReceiveTaskToProcessUseCase(repo TaskProcessorInterface, idGen IDGeneratorInterface) *ReceiveTaskToProcessUseCase {
 	return &ReceiveTaskToProcessUseCase{
-		Repo:   repo,
-		Outbox: outbox,
-		IDGen:  idGen,
+		Repo:  repo,
+		IDGen: idGen,
 	}
 }
 
@@ -26,15 +29,17 @@ type ReceiveTaskToProcessOutput struct {
 }
 
 func (u *ReceiveTaskToProcessUseCase) Execute(input *ReceiveTaskToProcessInput) (*ReceiveTaskToProcessOutput, error) {
+	message := strings.TrimSpace(input.Message)
+	if message == "" {
+		return nil, errors.New("message is empty")
+	}
+
 	createTaskDto := CreateTaskDTO{
 		ID:      u.IDGen.GenerateID(),
-		Message: input.Message,
+		Message: message,
 	}
 	task, err := u.Repo.MoveTaskToProcessing(createTaskDto)
 	if err != nil {
-		return nil, err
-	}
-	if err := u.Outbox.StoreUnprocessedEvent(task); err != nil {
 		return nil, err
 	}
 	return &ReceiveTaskToProcessOutput{

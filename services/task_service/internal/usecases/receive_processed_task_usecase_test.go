@@ -10,64 +10,39 @@ import (
 )
 
 type mockProcessorForReceiveProcessed struct {
-	SetTaskAsProcessedCalls int
-	SetTaskAsProcessedArgs  struct {
-		TaskID string
-	}
-	SetTaskAsProcessedFunc    func(taskID string) (entities.Task, error)
 	MoveTaskToProcessingCalls int
-}
+	MoveTaskToProcessingFunc   func(dto CreateTaskDTO) (entities.Task, error)
 
-type mockOutboxForReceiveProcessed struct {
-	StoreUnprocessedEventCalls int
-	StoreUnprocessedEventFunc   func(task entities.Task) error
-
-	StoreProcessedEventCalls int
-	StoreProcessedEventArgs  struct {
-		Task entities.Task
+	FinishProcessingCalls int
+	FinishProcessingArgs  struct {
+		DTO FinishProcessingDTO
 	}
-	StoreProcessedEventFunc func(task entities.Task) error
+	FinishProcessingFunc func(dto FinishProcessingDTO) (entities.Task, error)
 }
 
 func (m *mockProcessorForReceiveProcessed) MoveTaskToProcessing(dto CreateTaskDTO) (entities.Task, error) {
 	m.MoveTaskToProcessingCalls++
-	return entities.Task{}, nil
-}
-
-func (m *mockProcessorForReceiveProcessed) SetTaskAsProcessed(taskID string) (entities.Task, error) {
-	m.SetTaskAsProcessedCalls++
-	m.SetTaskAsProcessedArgs.TaskID = taskID
-	if m.SetTaskAsProcessedFunc != nil {
-		return m.SetTaskAsProcessedFunc(taskID)
+	if m.MoveTaskToProcessingFunc != nil {
+		return m.MoveTaskToProcessingFunc(dto)
 	}
 	return entities.Task{}, nil
 }
 
-func (m *mockOutboxForReceiveProcessed) StoreUnprocessedEvent(task entities.Task) error {
-	m.StoreUnprocessedEventCalls++
-	if m.StoreUnprocessedEventFunc != nil {
-		return m.StoreUnprocessedEventFunc(task)
+func (m *mockProcessorForReceiveProcessed) FinishProcessing(dto FinishProcessingDTO) (entities.Task, error) {
+	m.FinishProcessingCalls++
+	m.FinishProcessingArgs.DTO = dto
+	if m.FinishProcessingFunc != nil {
+		return m.FinishProcessingFunc(dto)
 	}
-	return nil
-}
-
-func (m *mockOutboxForReceiveProcessed) StoreProcessedEvent(task entities.Task) error {
-	m.StoreProcessedEventCalls++
-	m.StoreProcessedEventArgs.Task = task
-	if m.StoreProcessedEventFunc != nil {
-		return m.StoreProcessedEventFunc(task)
-	}
-	return nil
+	return entities.Task{}, nil
 }
 
 func TestNewReceiveProcessedTaskUseCaseShouldCreateReceiveProcessedTaskUseCase(t *testing.T) {
 	repo := &mockProcessorForReceiveProcessed{}
-	outbox := &mockOutboxForReceiveProcessed{}
-	sut := NewReceiveProcessedTaskUseCase(repo, outbox)
+	sut := NewReceiveProcessedTaskUseCase(repo)
 
 	assert.NotNil(t, sut)
 	assert.Same(t, repo, sut.Repo)
-	assert.Same(t, outbox, sut.Outbox)
 }
 
 func TestReceiveProcessedTaskExecuteShouldReturnSuccess(t *testing.T) {
@@ -80,45 +55,40 @@ func TestReceiveProcessedTaskExecuteShouldReturnSuccess(t *testing.T) {
 		UpdatedAt:  faker.Date(),
 	}
 	repo := &mockProcessorForReceiveProcessed{
-		SetTaskAsProcessedFunc: func(taskID string) (entities.Task, error) {
-			task.ID = taskID
+		FinishProcessingFunc: func(dto FinishProcessingDTO) (entities.Task, error) {
+			task.ID = dto.ID
+			task.BinaryCode = dto.BinaryCode
 			return task, nil
 		},
 	}
-	outbox := &mockOutboxForReceiveProcessed{}
-	sut := NewReceiveProcessedTaskUseCase(repo, outbox)
-	input := &ReceiveProcessedTaskInput{ID: faker.ID()}
+	sut := NewReceiveProcessedTaskUseCase(repo)
+	input := &ReceiveProcessedTaskInput{ID: faker.ID(), BinaryCode: task.BinaryCode}
 	output, err := sut.Execute(input)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, output)
 	assert.True(t, output.Success)
-	assert.Equal(t, 1, repo.SetTaskAsProcessedCalls)
-	assert.Equal(t, input.ID, repo.SetTaskAsProcessedArgs.TaskID)
-	assert.Equal(t, 1, outbox.StoreProcessedEventCalls)
-	assert.Equal(t, input.ID, outbox.StoreProcessedEventArgs.Task.ID)
+	assert.Equal(t, 1, repo.FinishProcessingCalls)
+	assert.Equal(t, input.ID, repo.FinishProcessingArgs.DTO.ID)
+	assert.Equal(t, input.BinaryCode, repo.FinishProcessingArgs.DTO.BinaryCode)
 	assert.Equal(t, 0, repo.MoveTaskToProcessingCalls)
-	assert.Equal(t, 0, outbox.StoreUnprocessedEventCalls)
 }
 
 func TestReceiveProcessedTaskExecuteShouldReturnErrorWhenRepoFails(t *testing.T) {
 	faker := test.FakeData{}
 	expectedErr := errors.New("set processed failure")
 	repo := &mockProcessorForReceiveProcessed{
-		SetTaskAsProcessedFunc: func(taskID string) (entities.Task, error) {
+		FinishProcessingFunc: func(dto FinishProcessingDTO) (entities.Task, error) {
 			return entities.Task{}, expectedErr
 		},
 	}
-	outbox := &mockOutboxForReceiveProcessed{}
-	sut := NewReceiveProcessedTaskUseCase(repo, outbox)
+	sut := NewReceiveProcessedTaskUseCase(repo)
 
-	input := &ReceiveProcessedTaskInput{ID: faker.ID()}
+	input := &ReceiveProcessedTaskInput{ID: faker.ID(), BinaryCode: faker.Phrase()}
 	output, err := sut.Execute(input)
 
 	assert.Nil(t, output)
 	assert.ErrorIs(t, err, expectedErr)
-	assert.Equal(t, 1, repo.SetTaskAsProcessedCalls)
+	assert.Equal(t, 1, repo.FinishProcessingCalls)
 	assert.Equal(t, 0, repo.MoveTaskToProcessingCalls)
-	assert.Equal(t, 0, outbox.StoreProcessedEventCalls)
-	assert.Equal(t, 0, outbox.StoreUnprocessedEventCalls)
 }
