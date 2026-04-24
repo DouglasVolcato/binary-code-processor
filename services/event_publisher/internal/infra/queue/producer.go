@@ -1,4 +1,4 @@
-package file
+package queue
 
 import (
 	"encoding/json"
@@ -40,6 +40,18 @@ func (p *Producer) DeclareQueue(name string) error {
 	return err
 }
 
+func (p *Producer) DeclareExchange(name string, kind string) error {
+	return p.channel.ExchangeDeclare(
+		name,
+		kind,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+}
+
 func (p *Producer) Publish(queue string, payload interface{}) error {
 	body, err := json.Marshal(payload)
 	if err != nil {
@@ -49,6 +61,24 @@ func (p *Producer) Publish(queue string, payload interface{}) error {
 	return p.channel.Publish(
 		"",
 		queue,
+		false,
+		false,
+		amqp091.Publishing{
+			ContentType: "application/json",
+			Body:        body,
+		},
+	)
+}
+
+func (p *Producer) PublishToExchange(exchange string, routingKey string, payload interface{}) error {
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+
+	return p.channel.Publish(
+		exchange,
+		routingKey,
 		false,
 		false,
 		amqp091.Publishing{

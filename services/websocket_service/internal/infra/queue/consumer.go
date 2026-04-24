@@ -1,4 +1,4 @@
-package file
+package queue
 
 import (
 	"log"
@@ -38,6 +38,28 @@ func (c *Consumer) DeclareQueue(name string) error {
 		nil,
 	)
 	return err
+}
+
+func (c *Consumer) DeclareExchange(name string, kind string) error {
+	return c.channel.ExchangeDeclare(
+		name,
+		kind,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+}
+
+func (c *Consumer) BindQueueToExchange(queue string, exchange string) error {
+	return c.channel.QueueBind(
+		queue,
+		"",
+		exchange,
+		false,
+		nil,
+	)
 }
 
 func (c *Consumer) Consume(queue string, handler func([]byte) error) error {
