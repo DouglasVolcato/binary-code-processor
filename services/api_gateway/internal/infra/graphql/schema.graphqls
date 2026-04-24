@@ -1,0 +1,19 @@
+# GraphQL schema example
+#
+# https://gqlgen.com/getting-started/
+
+type Task {
+  id: String!
+  message: String!
+  binaryCode: String!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type Query {
+  tasks(limit: Int, offset: Int): [Task!]!
+}
+
+type Mutation {
+  sendTask(messages: [String!]!): [Task!]!
+}

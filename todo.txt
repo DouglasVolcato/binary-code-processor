@@ -3,7 +3,7 @@ X usecases de cada serviço com suas abstracoes e testes de mocks
 - containers docker e docker compose geral
 X integração com banco de dados
 X interação com grpc
-- interação com graphql
+X interação com graphql
 X integração com rabbitmq
 - lógica das integrações
 - servers
