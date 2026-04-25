@@ -740,6 +740,20 @@ data:
             target_label: namespace
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod
+      - job_name: kubernetes-cadvisor
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        metrics_path: /metrics/cadvisor
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        tls_config:
+          insecure_skip_verify: true
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_node_address_InternalIP]
+            action: replace
+            target_label: __address__
+            regex: (.+)
+            replacement: $1:10250
 
 ---
 apiVersion: apps/v1
@@ -1238,6 +1252,114 @@ data:
             "w": 12,
             "x": 0,
             "y": 56
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "K8s CPU Usage by Pod",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"default\", pod=~\"api-gateway-.*|websocket-service-.*|task-service-.*|processing-service-.*|event-publisher-.*|postgres-.*|rabbitmq-.*|prometheus-.*|grafana-.*|kube-state-metrics-.*|postgres-exporter-.*|rabbitmq-exporter-.*\", container!=\"\", image!=\"\"}[5m]))",
+              "refId": "A",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "cores"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 56
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "K8s Memory Working Set by Pod",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"default\", pod=~\"api-gateway-.*|websocket-service-.*|task-service-.*|processing-service-.*|event-publisher-.*|postgres-.*|rabbitmq-.*|prometheus-.*|grafana-.*|kube-state-metrics-.*|postgres-exporter-.*|rabbitmq-exporter-.*\", container!=\"\", image!=\"\"})",
+              "refId": "A",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 64
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Go Goroutines",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "targets": [
+            {
+              "expr": "go_goroutines{job=~\"api-gateway|websocket-service|task-service|processing-service|event-publisher\"}",
+              "refId": "A",
+              "legendFormat": "{{job}} / {{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 12,
+            "y": 64
+          }
+        },
+        {
+          "type": "timeseries",
+          "title": "Go Threads",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "targets": [
+            {
+              "expr": "go_threads{job=~\"api-gateway|websocket-service|task-service|processing-service|event-publisher\"}",
+              "refId": "A",
+              "legendFormat": "{{job}} / {{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "none"
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 8,
+            "w": 12,
+            "x": 0,
+            "y": 72
           }
         }
       ]
