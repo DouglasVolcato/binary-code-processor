@@ -59,13 +59,19 @@
 				
 				<option value="file1">github.com/douglasvolcato/binary-code-processor/processing_service/internal/entities/task_entity.go (100.0%)</option>
 				
-				<option value="file2">github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task.pb.go (0.0%)</option>
+				<option value="file2">github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/client.go (0.0%)</option>
 				
-				<option value="file3">github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task_grpc.pb.go (0.0%)</option>
+				<option value="file3">github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task.pb.go (0.0%)</option>
 				
-				<option value="file4">github.com/douglasvolcato/binary-code-processor/processing_service/internal/usecases/process_task_usecase.go (100.0%)</option>
+				<option value="file4">github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task_grpc.pb.go (0.0%)</option>
 				
-				<option value="file5">github.com/douglasvolcato/binary-code-processor/processing_service/test/faker.go (0.0%)</option>
+				<option value="file5">github.com/douglasvolcato/binary-code-processor/processing_service/internal/queue/consumer.go (0.0%)</option>
+				
+				<option value="file6">github.com/douglasvolcato/binary-code-processor/processing_service/internal/queue/producer.go (0.0%)</option>
+				
+				<option value="file7">github.com/douglasvolcato/binary-code-processor/processing_service/internal/usecases/process_task_usecase.go (95.0%)</option>
+				
+				<option value="file8">github.com/douglasvolcato/binary-code-processor/processing_service/test/faker.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -81,7 +87,147 @@
 		
 		<pre class="file" id="file0" style="display: none">package main
 
-func main() {<span class="cov0" title="0">}</span>
+import (
+        "context"
+        "encoding/json"
+        "log"
+        "net/http"
+        "os"
+        "path/filepath"
+        "strings"
+        "time"
+
+        taskgrpc "github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc"
+        "github.com/douglasvolcato/binary-code-processor/processing_service/internal/queue"
+        "github.com/douglasvolcato/binary-code-processor/processing_service/internal/usecases"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "google.golang.org/grpc"
+        "google.golang.org/grpc/credentials/insecure"
+)
+
+const defaultRabbitURL = "amqp://guest:guest@localhost:5672/"
+const defaultTaskServiceAddr = "localhost:50051"
+const defaultQueueName = "task.process"
+const defaultMetricsPort = "8083"
+
+type eventMessage struct {
+        ID string `json:"id"`
+}
+
+func main() <span class="cov0" title="0">{
+        loadDotEnv()
+
+        rabbitURL := getenv("RABBITMQ_URL", defaultRabbitURL)
+        taskServiceAddr := getenv("TASK_SERVICE_ADDR", defaultTaskServiceAddr)
+        queueName := getenv("PROCESS_QUEUE", defaultQueueName)
+        metricsPort := getenv("METRICS_PORT", defaultMetricsPort)
+
+        dialCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+
+        conn, err := grpc.DialContext(dialCtx, taskServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer conn.Close()
+
+        go serveHTTPMetrics(metricsPort)
+
+        client := taskgrpc.NewClient(conn)
+        usecase := usecases.NewProcessTaskUseCase(client, client)
+
+        consumer, err := queue.NewConsumer(rabbitURL)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer consumer.Close()
+
+        if err := consumer.DeclareQueue(queueName); err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+
+        <span class="cov0" title="0">if err := consumer.Consume(queueName, func(payload []byte) error </span><span class="cov0" title="0">{
+                var msg eventMessage
+                if err := json.Unmarshal(payload, &amp;msg); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+                defer cancel()
+
+                _, err := usecase.Execute(&amp;usecases.ProcessTaskInput{
+                        Ctx: ctx,
+                        ID:  strings.TrimSpace(msg.ID),
+                })
+                return err</span>
+        }); err != nil <span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+
+        <span class="cov0" title="0">select </span>{}
+}
+
+func serveHTTPMetrics(port string) <span class="cov0" title="0">{
+        mux := http.NewServeMux()
+        mux.Handle("/health", healthHandler())
+        mux.Handle("/healthz", healthHandler())
+        mux.Handle("/metrics", promhttp.Handler())
+
+        server := &amp;http.Server{
+                Addr:              ":" + port,
+                Handler:           mux,
+                ReadHeaderTimeout: 5 * time.Second,
+        }
+
+        log.Printf("processing service metrics listening on :%s", port)
+        if err := server.ListenAndServe(); err != nil &amp;&amp; err != http.ErrServerClosed </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+}
+
+func loadDotEnv() <span class="cov0" title="0">{
+        for _, path := range []string{".env", filepath.Join("..", ".env"), filepath.Join("..", "..", ".env")} </span><span class="cov0" title="0">{
+                if err := loadEnvFile(path); err == nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+        }
+}
+
+func loadEnvFile(path string) error <span class="cov0" title="0">{
+        data, err := os.ReadFile(path)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">for _, line := range strings.Split(string(data), "\n") </span><span class="cov0" title="0">{
+                line = strings.TrimSpace(line)
+                if line == "" || strings.HasPrefix(line, "#") </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">key, value, ok := strings.Cut(line, "=")
+                if !ok </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">_ = os.Setenv(strings.TrimSpace(key), strings.Trim(strings.TrimSpace(value), `"'`))</span>
+        }
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func getenv(key string, fallback string) string <span class="cov0" title="0">{
+        value := os.Getenv(key)
+        if value == "" </span><span class="cov0" title="0">{
+                return fallback
+        }</span>
+        <span class="cov0" title="0">return value</span>
+}
+
+func healthHandler() http.Handler <span class="cov0" title="0">{
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+                w.WriteHeader(http.StatusOK)
+                _, _ = w.Write([]byte("ok"))
+        }</span>)
+}
 </pre>
 		
 		<pre class="file" id="file1" style="display: none">package entities
@@ -129,13 +275,131 @@ func (t *Task) Validate() error <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file2" style="display: none">// Code generated by protoc-gen-go. DO NOT EDIT.
+		<pre class="file" id="file2" style="display: none">package grpc
+
+import (
+        "context"
+        "encoding/json"
+        "errors"
+
+        "github.com/douglasvolcato/binary-code-processor/processing_service/internal/entities"
+        "github.com/douglasvolcato/binary-code-processor/processing_service/internal/usecases"
+        "google.golang.org/grpc"
+        "google.golang.org/grpc/encoding"
+)
+
+type jsonCodec struct{}
+
+func (jsonCodec) Marshal(v interface{}) ([]byte, error) <span class="cov0" title="0">{
+        return json.Marshal(v)
+}</span>
+
+func (jsonCodec) Unmarshal(data []byte, v interface{}) error <span class="cov0" title="0">{
+        return json.Unmarshal(data, v)
+}</span>
+
+func (jsonCodec) Name() string <span class="cov0" title="0">{
+        return "json"
+}</span>
+
+func init() <span class="cov0" title="0">{
+        encoding.RegisterCodec(jsonCodec{})
+}</span>
+
+type TaskRecord struct {
+        ID         string `json:"id"`
+        Message    string `json:"message"`
+        BinaryCode string `json:"binaryCode"`
+        CreatedAt  string `json:"createdAt"`
+        UpdatedAt  string `json:"updatedAt"`
+}
+
+type TaskByIDRequest struct {
+        ID string `json:"id"`
+}
+
+type TaskByIDResponse struct {
+        Task TaskRecord `json:"task"`
+}
+
+type ProcessedTaskRequest struct {
+        ID         string `json:"id"`
+        BinaryCode string `json:"binaryCode"`
+}
+
+type ProcessedTaskResponse struct {
+        Success bool `json:"success"`
+}
+
+type Client struct {
+        conn *grpc.ClientConn
+}
+
+func NewClient(conn *grpc.ClientConn) *Client <span class="cov0" title="0">{
+        return &amp;Client{conn: conn}
+}</span>
+
+func (c *Client) GetTaskByID(ctx context.Context, taskID string) (entities.Task, error) <span class="cov0" title="0">{
+        out := new(TaskByIDResponse)
+        if err := c.conn.Invoke(
+                ctx,
+                "/task.TaskService/GetTaskByID",
+                &amp;TaskByIDRequest{ID: taskID},
+                out,
+                grpc.ForceCodec(jsonCodec{}),
+        ); err != nil </span><span class="cov0" title="0">{
+                return entities.Task{}, err
+        }</span>
+
+        <span class="cov0" title="0">return entities.Task{
+                ID:         out.Task.ID,
+                Message:    out.Task.Message,
+                BinaryCode: out.Task.BinaryCode,
+                CreatedAt:  out.Task.CreatedAt,
+                UpdatedAt:  out.Task.UpdatedAt,
+        }, nil</span>
+}
+
+func (c *Client) FinishProcessing(ctx context.Context, dto usecases.FinishProcessingDTO) error <span class="cov0" title="0">{
+        stream, err := c.conn.NewStream(
+                ctx,
+                &amp;grpc.StreamDesc{StreamName: "SendProcessedTask", ClientStreams: true},
+                "/task.TaskService/SendProcessedTask",
+                grpc.ForceCodec(jsonCodec{}),
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">if err := stream.SendMsg(&amp;ProcessedTaskRequest{
+                ID:         dto.ID,
+                BinaryCode: dto.BinaryCode,
+        }); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">if err := stream.CloseSend(); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">out := new(ProcessedTaskResponse)
+        if err := stream.RecvMsg(out); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">if !out.Success </span><span class="cov0" title="0">{
+                return errors.New("task service rejected processed task")
+        }</span>
+        <span class="cov0" title="0">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">// Code generated by protoc-gen-go. DO NOT EDIT.
 // versions:
 //         protoc-gen-go v1.36.11
 //         protoc        v3.12.4
 // source: task.proto
 
-package task
+package grpc
 
 import (
         protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -251,7 +515,7 @@ const file_task_proto_rawDesc = "" +
         "\x19SendProcessedTaskResponse\x12\x18\n" +
         "\amessage\x18\x01 \x01(\tR\amessage2g\n" +
         "\vTaskService\x12X\n" +
-        "\x11SendProcessedTask\x12\x1e.task.SendProcessedTaskRequest\x1a\x1f.task.SendProcessedTaskResponse\"\x00(\x01BYZWgithub.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task;taskb\x06proto3"
+        "\x11SendProcessedTask\x12\x1e.task.SendProcessedTaskRequest\x1a\x1f.task.SendProcessedTaskResponse\"\x00(\x01BbZ`github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc/task;taskb\x06proto3"
 
 var (
         file_task_proto_rawDescOnce sync.Once
@@ -305,13 +569,13 @@ func file_task_proto_init() <span class="cov0" title="0">{
 }
 </pre>
 		
-		<pre class="file" id="file3" style="display: none">// Code generated by protoc-gen-go-grpc. DO NOT EDIT.
+		<pre class="file" id="file4" style="display: none">// Code generated by protoc-gen-go-grpc. DO NOT EDIT.
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v3.12.4
 // source: task.proto
 
-package task
+package grpc
 
 import (
         context "context"
@@ -421,9 +685,208 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 }
 </pre>
 		
-		<pre class="file" id="file4" style="display: none">package usecases
+		<pre class="file" id="file5" style="display: none">package queue
 
 import (
+        "log"
+
+        "github.com/rabbitmq/amqp091-go"
+)
+
+type Consumer struct {
+        conn    *amqp091.Connection
+        channel *amqp091.Channel
+}
+
+func NewConsumer(url string) (*Consumer, error) <span class="cov0" title="0">{
+        conn, err := amqp091.Dial(url)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">ch, err := conn.Channel()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return &amp;Consumer{
+                conn:    conn,
+                channel: ch,
+        }, nil</span>
+}
+
+func (c *Consumer) DeclareQueue(name string) error <span class="cov0" title="0">{
+        _, err := c.channel.QueueDeclare(
+                name,
+                true,
+                false,
+                false,
+                false,
+                nil,
+        )
+        return err
+}</span>
+
+func (c *Consumer) BindQueueToExchange(queue string, exchange string) error <span class="cov0" title="0">{
+        return c.channel.QueueBind(
+                queue,
+                "",
+                exchange,
+                false,
+                nil,
+        )
+}</span>
+
+func (c *Consumer) Consume(queue string, handler func([]byte) error) error <span class="cov0" title="0">{
+
+        err := c.channel.Qos(1, 0, false)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">msgs, err := c.channel.Consume(
+                queue,
+                "",
+                false, // manual ack
+                false,
+                false,
+                false,
+                nil,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                for msg := range msgs </span><span class="cov0" title="0">{
+                        err := handler(msg.Body)
+
+                        if err != nil </span><span class="cov0" title="0">{
+                                log.Println("erro ao processar:", err)
+                                msg.Nack(false, true) // requeue
+                        }</span> else<span class="cov0" title="0"> {
+                                msg.Ack(false)
+                        }</span>
+                }
+        }()
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (c *Consumer) Close() <span class="cov0" title="0">{
+        if c.channel != nil </span><span class="cov0" title="0">{
+                c.channel.Close()
+        }</span>
+        <span class="cov0" title="0">if c.conn != nil </span><span class="cov0" title="0">{
+                c.conn.Close()
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package queue
+
+import (
+        "encoding/json"
+
+        "github.com/rabbitmq/amqp091-go"
+)
+
+type Producer struct {
+        conn    *amqp091.Connection
+        channel *amqp091.Channel
+}
+
+func NewProducer(url string) (*Producer, error) <span class="cov0" title="0">{
+        conn, err := amqp091.Dial(url)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">ch, err := conn.Channel()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return &amp;Producer{
+                conn:    conn,
+                channel: ch,
+        }, nil</span>
+}
+
+func (p *Producer) DeclareQueue(name string) error <span class="cov0" title="0">{
+        _, err := p.channel.QueueDeclare(
+                name,
+                true,  // durable
+                false, // auto-delete
+                false, // exclusive
+                false,
+                nil,
+        )
+        return err
+}</span>
+
+func (p *Producer) DeclareExchange(name string, kind string) error <span class="cov0" title="0">{
+        return p.channel.ExchangeDeclare(
+                name,
+                kind,
+                true,
+                false,
+                false,
+                false,
+                nil,
+        )
+}</span>
+
+func (p *Producer) Publish(queue string, payload interface{}) error <span class="cov0" title="0">{
+        body, err := json.Marshal(payload)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">return p.channel.Publish(
+                "",
+                queue,
+                false,
+                false,
+                amqp091.Publishing{
+                        ContentType: "application/json",
+                        Body:        body,
+                },
+        )</span>
+}
+
+func (p *Producer) PublishToExchange(exchange string, routingKey string, payload interface{}) error <span class="cov0" title="0">{
+        body, err := json.Marshal(payload)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">return p.channel.Publish(
+                exchange,
+                routingKey,
+                false,
+                false,
+                amqp091.Publishing{
+                        ContentType: "application/json",
+                        Body:        body,
+                },
+        )</span>
+}
+
+func (p *Producer) Close() <span class="cov0" title="0">{
+        if p.channel != nil </span><span class="cov0" title="0">{
+                p.channel.Close()
+        }</span>
+        <span class="cov0" title="0">if p.conn != nil </span><span class="cov0" title="0">{
+                p.conn.Close()
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package usecases
+
+import (
+        "context"
         "errors"
         "fmt"
         "strings"
@@ -442,7 +905,8 @@ func NewProcessTaskUseCase(repo TaskRepositoryInterface, processor TaskProcessor
 }</span>
 
 type ProcessTaskInput struct {
-        ID string
+        Ctx context.Context
+        ID  string
 }
 
 type ProcessTaskOutput struct {
@@ -451,7 +915,12 @@ type ProcessTaskOutput struct {
 }
 
 func (u *ProcessTaskUseCase) Execute(input *ProcessTaskInput) (*ProcessTaskOutput, error) <span class="cov8" title="1">{
-        task, err := u.Repo.GetTaskByID(input.ID)
+        ctx := input.Ctx
+        if ctx == nil </span><span class="cov0" title="0">{
+                ctx = context.Background()
+        }</span>
+
+        <span class="cov8" title="1">task, err := u.Repo.GetTaskByID(ctx, input.ID)
         if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
@@ -459,7 +928,7 @@ func (u *ProcessTaskUseCase) Execute(input *ProcessTaskInput) (*ProcessTaskOutpu
         if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
-        <span class="cov8" title="1">err = u.Processor.FinishProcessing(FinishProcessingDTO{
+        <span class="cov8" title="1">err = u.Processor.FinishProcessing(ctx, FinishProcessingDTO{
                 ID:         task.ID,
                 BinaryCode: binaryCode,
         })
@@ -485,7 +954,7 @@ func (u *ProcessTaskUseCase) convertMessageToBinaryCode(message string) (string,
 }
 </pre>
 		
-		<pre class="file" id="file5" style="display: none">package test
+		<pre class="file" id="file8" style="display: none">package test
 
 import (
         "github.com/go-faker/faker/v4"

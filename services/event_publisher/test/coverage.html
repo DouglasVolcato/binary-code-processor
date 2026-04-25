@@ -59,11 +59,23 @@
 				
 				<option value="file1">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/entities/event_entity.go (100.0%)</option>
 				
-				<option value="file2">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/usecases/process_unprocessed_events_usecase.go (100.0%)</option>
+				<option value="file2">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/database/db.go (0.0%)</option>
 				
-				<option value="file3">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/usecases/send_processed_events_usecase.go (100.0%)</option>
+				<option value="file3">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/database/repository.go (0.0%)</option>
 				
-				<option value="file4">github.com/douglasvolcato/binary-code-processor/event_publisher/test/faker.go (0.0%)</option>
+				<option value="file4">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/processor/processor.go (0.0%)</option>
+				
+				<option value="file5">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/queue/consumer.go (0.0%)</option>
+				
+				<option value="file6">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/queue/producer.go (0.0%)</option>
+				
+				<option value="file7">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/rabbitmq/broker.go (0.0%)</option>
+				
+				<option value="file8">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/usecases/process_unprocessed_events_usecase.go (91.7%)</option>
+				
+				<option value="file9">github.com/douglasvolcato/binary-code-processor/event_publisher/internal/usecases/send_processed_events_usecase.go (91.7%)</option>
+				
+				<option value="file10">github.com/douglasvolcato/binary-code-processor/event_publisher/test/faker.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -79,7 +91,138 @@
 		
 		<pre class="file" id="file0" style="display: none">package main
 
-func main() {<span class="cov0" title="0">}</span>
+import (
+        "log"
+        "net/http"
+        "os"
+        "path/filepath"
+        "strings"
+        "time"
+
+        "github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/database"
+        "github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/processor"
+        "github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/rabbitmq"
+        "github.com/douglasvolcato/binary-code-processor/event_publisher/internal/usecases"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+const defaultDatabaseURL = "postgres://postgres:postgres@localhost:5432/task_service?sslmode=disable"
+const defaultRabbitURL = "amqp://guest:guest@localhost:5672/"
+const defaultMetricsPort = "8084"
+
+func main() <span class="cov0" title="0">{
+        loadDotEnv()
+
+        databaseURL := getenv("DATABASE_URL", defaultDatabaseURL)
+        rabbitURL := getenv("RABBITMQ_URL", defaultRabbitURL)
+        metricsPort := getenv("METRICS_PORT", defaultMetricsPort)
+
+        db, err := database.NewDB(databaseURL)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        repo := database.NewRepository(db)
+        localProcessor := processor.NewProcessor()
+        remoteProcessor, err := rabbitmq.NewBroker(rabbitURL)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer remoteProcessor.Close()
+
+        unprocessedUseCase := usecases.NewProcessUnprocessedEventsUseCase(repo, localProcessor, remoteProcessor)
+        processedUseCase := usecases.NewSendProcessedEventsUseCase(repo, localProcessor, remoteProcessor)
+
+        interval := time.Second * 5
+        if raw := os.Getenv("POLL_INTERVAL_SECONDS"); raw != "" </span><span class="cov0" title="0">{
+                if parsed, parseErr := time.ParseDuration(raw); parseErr == nil </span><span class="cov0" title="0">{
+                        interval = parsed
+                }</span> else<span class="cov0" title="0"> if parsed, parseErr := time.ParseDuration(raw + "s"); parseErr == nil </span><span class="cov0" title="0">{
+                        interval = parsed
+                }</span>
+        }
+        <span class="cov0" title="0">if interval &lt;= 0 </span><span class="cov0" title="0">{
+                interval = 5 * time.Second
+        }</span>
+
+        <span class="cov0" title="0">go serveHTTPMetrics(metricsPort)
+
+        ticker := time.NewTicker(interval)
+        defer ticker.Stop()
+
+        for </span><span class="cov0" title="0">{
+                if _, err := unprocessedUseCase.Execute(&amp;usecases.ProcessUnprocessedEventsInput{}); err != nil </span><span class="cov0" title="0">{
+                        log.Println("process unprocessed events:", err)
+                }</span>
+                <span class="cov0" title="0">if _, err := processedUseCase.Execute(&amp;usecases.SendProcessedEventsInput{}); err != nil </span><span class="cov0" title="0">{
+                        log.Println("send processed events:", err)
+                }</span>
+                <span class="cov0" title="0">&lt;-ticker.C</span>
+        }
+}
+
+func serveHTTPMetrics(port string) <span class="cov0" title="0">{
+        mux := http.NewServeMux()
+        mux.Handle("/health", healthHandler())
+        mux.Handle("/healthz", healthHandler())
+        mux.Handle("/metrics", promhttp.Handler())
+
+        server := &amp;http.Server{
+                Addr:              ":" + port,
+                Handler:           mux,
+                ReadHeaderTimeout: 5 * time.Second,
+        }
+
+        log.Printf("event publisher metrics listening on :%s", port)
+        if err := server.ListenAndServe(); err != nil &amp;&amp; err != http.ErrServerClosed </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+}
+
+func loadDotEnv() <span class="cov0" title="0">{
+        for _, path := range []string{".env", filepath.Join("..", ".env"), filepath.Join("..", "..", ".env")} </span><span class="cov0" title="0">{
+                if err := loadEnvFile(path); err == nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+        }
+}
+
+func loadEnvFile(path string) error <span class="cov0" title="0">{
+        data, err := os.ReadFile(path)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">for _, line := range strings.Split(string(data), "\n") </span><span class="cov0" title="0">{
+                line = strings.TrimSpace(line)
+                if line == "" || strings.HasPrefix(line, "#") </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">key, value, ok := strings.Cut(line, "=")
+                if !ok </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">_ = os.Setenv(strings.TrimSpace(key), strings.Trim(strings.TrimSpace(value), `"'`))</span>
+        }
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func getenv(key string, fallback string) string <span class="cov0" title="0">{
+        value := os.Getenv(key)
+        if value == "" </span><span class="cov0" title="0">{
+                return fallback
+        }</span>
+        <span class="cov0" title="0">return value</span>
+}
+
+func healthHandler() http.Handler <span class="cov0" title="0">{
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+                w.WriteHeader(http.StatusOK)
+                _, _ = w.Write([]byte("ok"))
+        }</span>)
+}
 </pre>
 		
 		<pre class="file" id="file1" style="display: none">package entities
@@ -90,8 +233,9 @@ import (
 )
 
 type Event struct {
-        ID     string
-        Status string
+        ID         string
+        Status     string
+        BinaryCode string
 }
 
 func NewEvent(id string, status string) *Event <span class="cov8" title="1">{
@@ -112,7 +256,395 @@ func (e *Event) Validate() error <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file2" style="display: none">package usecases
+		<pre class="file" id="file2" style="display: none">package database
+
+import (
+        "context"
+        "database/sql"
+        "time"
+
+        _ "github.com/jackc/pgx/v5/stdlib"
+)
+
+func NewDB(dsn string) (*sql.DB, error) <span class="cov0" title="0">{
+        db, err := sql.Open("pgx", dsn)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">db.SetMaxOpenConns(25)
+        db.SetMaxIdleConns(10)
+        db.SetConnMaxLifetime(30 * time.Minute)
+
+        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+
+        if err := db.PingContext(ctx); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return db, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package database
+
+import (
+        "database/sql"
+        "fmt"
+
+        "github.com/douglasvolcato/binary-code-processor/event_publisher/internal/entities"
+)
+
+const outboxTable = "task_outbox_events"
+
+type Repository struct {
+        DB *sql.DB
+}
+
+func NewRepository(db *sql.DB) *Repository <span class="cov0" title="0">{
+        return &amp;Repository{DB: db}
+}</span>
+
+func (r *Repository) GetUnprocessedEvents(limit int, offset int) ([]entities.Event, error) <span class="cov0" title="0">{
+        return r.getEventsByStatus("unprocessed", limit, offset)
+}</span>
+
+func (r *Repository) GetProcessedEvents(limit int, offset int) ([]entities.Event, error) <span class="cov0" title="0">{
+        return r.getEventsByStatus("processed", limit, offset)
+}</span>
+
+func (r *Repository) getEventsByStatus(status string, limit int, offset int) ([]entities.Event, error) <span class="cov0" title="0">{
+        rows, err := r.DB.Query(
+                fmt.Sprintf(`
+                        SELECT task_id, status, binary_code
+                        FROM %s
+                        WHERE status = $1
+                        ORDER BY created_at ASC
+                        LIMIT $2 OFFSET $3
+                `, outboxTable),
+                status,
+                limit,
+                offset,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">defer rows.Close()
+
+        var events []entities.Event
+        for rows.Next() </span><span class="cov0" title="0">{
+                var event entities.Event
+                if err := rows.Scan(&amp;event.ID, &amp;event.Status, &amp;event.BinaryCode); err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">events = append(events, event)</span>
+        }
+        <span class="cov0" title="0">if err := rows.Err(); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return events, nil</span>
+}
+
+func (r *Repository) DeleteEventByID(id string) error <span class="cov0" title="0">{
+        _, err := r.DB.Exec(
+                fmt.Sprintf(`
+                        DELETE FROM %s
+                        WHERE task_id = $1
+                `, outboxTable),
+                id,
+        )
+        return err
+}</span>
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package processor
+
+import "github.com/douglasvolcato/binary-code-processor/event_publisher/internal/entities"
+
+type Processor struct{}
+
+func NewProcessor() *Processor <span class="cov0" title="0">{
+        return &amp;Processor{}
+}</span>
+
+func (p *Processor) SendEventToProcess(event entities.Event) error <span class="cov0" title="0">{
+        return event.Validate()
+}</span>
+
+func (p *Processor) SendFanoutEvent(event entities.Event) error <span class="cov0" title="0">{
+        return event.Validate()
+}</span>
+
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package queue
+
+import (
+        "log"
+
+        "github.com/rabbitmq/amqp091-go"
+)
+
+type Consumer struct {
+        conn    *amqp091.Connection
+        channel *amqp091.Channel
+}
+
+func NewConsumer(url string) (*Consumer, error) <span class="cov0" title="0">{
+        conn, err := amqp091.Dial(url)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">ch, err := conn.Channel()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return &amp;Consumer{
+                conn:    conn,
+                channel: ch,
+        }, nil</span>
+}
+
+func (c *Consumer) DeclareQueue(name string) error <span class="cov0" title="0">{
+        _, err := c.channel.QueueDeclare(
+                name,
+                true,
+                false,
+                false,
+                false,
+                nil,
+        )
+        return err
+}</span>
+
+func (c *Consumer) BindQueueToExchange(queue string, exchange string) error <span class="cov0" title="0">{
+        return c.channel.QueueBind(
+                queue,
+                "",
+                exchange,
+                false,
+                nil,
+        )
+}</span>
+
+func (c *Consumer) Consume(queue string, handler func([]byte) error) error <span class="cov0" title="0">{
+
+        err := c.channel.Qos(1, 0, false)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">msgs, err := c.channel.Consume(
+                queue,
+                "",
+                false, // manual ack
+                false,
+                false,
+                false,
+                nil,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                for msg := range msgs </span><span class="cov0" title="0">{
+                        err := handler(msg.Body)
+
+                        if err != nil </span><span class="cov0" title="0">{
+                                log.Println("erro ao processar:", err)
+                                msg.Nack(false, true) // requeue
+                        }</span> else<span class="cov0" title="0"> {
+                                msg.Ack(false)
+                        }</span>
+                }
+        }()
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (c *Consumer) Close() <span class="cov0" title="0">{
+        if c.channel != nil </span><span class="cov0" title="0">{
+                c.channel.Close()
+        }</span>
+        <span class="cov0" title="0">if c.conn != nil </span><span class="cov0" title="0">{
+                c.conn.Close()
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file6" style="display: none">package queue
+
+import (
+        "encoding/json"
+
+        "github.com/rabbitmq/amqp091-go"
+)
+
+type Producer struct {
+        conn    *amqp091.Connection
+        channel *amqp091.Channel
+}
+
+func NewProducer(url string) (*Producer, error) <span class="cov0" title="0">{
+        conn, err := amqp091.Dial(url)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">ch, err := conn.Channel()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return &amp;Producer{
+                conn:    conn,
+                channel: ch,
+        }, nil</span>
+}
+
+func (p *Producer) DeclareQueue(name string) error <span class="cov0" title="0">{
+        _, err := p.channel.QueueDeclare(
+                name,
+                true,  // durable
+                false, // auto-delete
+                false, // exclusive
+                false,
+                nil,
+        )
+        return err
+}</span>
+
+func (p *Producer) DeclareExchange(name string, kind string) error <span class="cov0" title="0">{
+        return p.channel.ExchangeDeclare(
+                name,
+                kind,
+                true,
+                false,
+                false,
+                false,
+                nil,
+        )
+}</span>
+
+func (p *Producer) Publish(queue string, payload interface{}) error <span class="cov0" title="0">{
+        body, err := json.Marshal(payload)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">return p.channel.Publish(
+                "",
+                queue,
+                false,
+                false,
+                amqp091.Publishing{
+                        ContentType: "application/json",
+                        Body:        body,
+                },
+        )</span>
+}
+
+func (p *Producer) PublishToExchange(exchange string, routingKey string, payload interface{}) error <span class="cov0" title="0">{
+        body, err := json.Marshal(payload)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">return p.channel.Publish(
+                exchange,
+                routingKey,
+                false,
+                false,
+                amqp091.Publishing{
+                        ContentType: "application/json",
+                        Body:        body,
+                },
+        )</span>
+}
+
+func (p *Producer) Close() <span class="cov0" title="0">{
+        if p.channel != nil </span><span class="cov0" title="0">{
+                p.channel.Close()
+        }</span>
+        <span class="cov0" title="0">if p.conn != nil </span><span class="cov0" title="0">{
+                p.conn.Close()
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file7" style="display: none">package rabbitmq
+
+import (
+        "github.com/douglasvolcato/binary-code-processor/event_publisher/internal/entities"
+        queuefile "github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/queue"
+)
+
+const (
+        defaultQueueName    = "task.process"
+        defaultExchangeName = "task.processed"
+)
+
+type Broker struct {
+        producer      *queuefile.Producer
+        queueName     string
+        exchangeName  string
+}
+
+func NewBroker(url string) (*Broker, error) <span class="cov0" title="0">{
+        producer, err := queuefile.NewProducer(url)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if err := producer.DeclareQueue(defaultQueueName); err != nil </span><span class="cov0" title="0">{
+                producer.Close()
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if err := producer.DeclareExchange(defaultExchangeName, "fanout"); err != nil </span><span class="cov0" title="0">{
+                producer.Close()
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return &amp;Broker{
+                producer:     producer,
+                queueName:    defaultQueueName,
+                exchangeName: defaultExchangeName,
+        }, nil</span>
+}
+
+func (b *Broker) SendToQueue(event entities.Event) error <span class="cov0" title="0">{
+        return b.producer.Publish(b.queueName, eventPayload{
+                ID:         event.ID,
+                Status:     event.Status,
+                BinaryCode: event.BinaryCode,
+        })
+}</span>
+
+func (b *Broker) SendFanoutEvent(event entities.Event) error <span class="cov0" title="0">{
+        return b.producer.PublishToExchange(b.exchangeName, "", eventPayload{
+                ID:         event.ID,
+                Status:     event.Status,
+                BinaryCode: event.BinaryCode,
+        })
+}</span>
+
+func (b *Broker) Close() <span class="cov0" title="0">{
+        b.producer.Close()
+}</span>
+
+type eventPayload struct {
+        ID         string `json:"id"`
+        Status     string `json:"status"`
+        BinaryCode string `json:"binaryCode"`
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package usecases
 
 type ProcessUnprocessedEventsUseCase struct {
         Repo            EventRepositoryInterface
@@ -146,12 +678,15 @@ func (u *ProcessUnprocessedEventsUseCase) Execute(input *ProcessUnprocessedEvent
                 <span class="cov8" title="1">if err := u.Processor.SendEventToProcess(event); err != nil </span><span class="cov8" title="1">{
                         return nil, err
                 }</span>
+                <span class="cov8" title="1">if err := u.Repo.DeleteEventByID(event.ID); err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
         }
         <span class="cov8" title="1">return &amp;ProcessUnprocessedEventsOutput{}, nil</span>
 }
 </pre>
 		
-		<pre class="file" id="file3" style="display: none">package usecases
+		<pre class="file" id="file9" style="display: none">package usecases
 
 type SendProcessedEventsUseCase struct {
         Repo            EventRepositoryInterface
@@ -185,12 +720,15 @@ func (u *SendProcessedEventsUseCase) Execute(input *SendProcessedEventsInput) (*
                 <span class="cov8" title="1">if err := u.Processor.SendFanoutEvent(event); err != nil </span><span class="cov8" title="1">{
                         return nil, err
                 }</span>
+                <span class="cov8" title="1">if err := u.Repo.DeleteEventByID(event.ID); err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
         }
         <span class="cov8" title="1">return &amp;SendProcessedEventsOutput{}, nil</span>
 }
 </pre>
 		
-		<pre class="file" id="file4" style="display: none">package test
+		<pre class="file" id="file10" style="display: none">package test
 
 import (
         "github.com/go-faker/faker/v4"

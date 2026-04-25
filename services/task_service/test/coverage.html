@@ -59,19 +59,27 @@
 				
 				<option value="file1">github.com/douglasvolcato/binary-code-processor/task_service/internal/entities/task_entity.go (100.0%)</option>
 				
-				<option value="file2">github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task.pb.go (0.0%)</option>
+				<option value="file2">github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/database/db.go (44.4%)</option>
 				
-				<option value="file3">github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task_grpc.pb.go (0.0%)</option>
+				<option value="file3">github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/database/repository.go (0.0%)</option>
 				
-				<option value="file4">github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_task_by_id_usecase.go (100.0%)</option>
+				<option value="file4">github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/service.go (0.0%)</option>
 				
-				<option value="file5">github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_tasks_usecase.go (100.0%)</option>
+				<option value="file5">github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task.pb.go (0.0%)</option>
 				
-				<option value="file6">github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_processed_task_usecase.go (85.7%)</option>
+				<option value="file6">github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task_grpc.pb.go (0.0%)</option>
 				
-				<option value="file7">github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_task_to_process_usecase.go (87.5%)</option>
+				<option value="file7">github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/id/generator.go (0.0%)</option>
 				
-				<option value="file8">github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go (0.0%)</option>
+				<option value="file8">github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_task_by_id_usecase.go (87.5%)</option>
+				
+				<option value="file9">github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/get_tasks_usecase.go (87.5%)</option>
+				
+				<option value="file10">github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_processed_task_usecase.go (78.6%)</option>
+				
+				<option value="file11">github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases/receive_task_to_process_usecase.go (83.3%)</option>
+				
+				<option value="file12">github.com/douglasvolcato/binary-code-processor/task_service/test/faker.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -87,7 +95,128 @@
 		
 		<pre class="file" id="file0" style="display: none">package main
 
-func main() {<span class="cov0" title="0">}</span>
+import (
+        "log"
+        "net"
+        "net/http"
+        "os"
+        "path/filepath"
+        "strings"
+        "time"
+
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/database"
+        taskgrpc "github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc"
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/infra/id"
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "google.golang.org/grpc"
+)
+
+const defaultDatabaseURL = "postgres://postgres:postgres@localhost:5432/task_service?sslmode=disable"
+const defaultPort = "50051"
+const defaultMetricsPort = "8081"
+
+func main() <span class="cov0" title="0">{
+        loadDotEnv()
+
+        databaseURL := getenv("DATABASE_URL", defaultDatabaseURL)
+        port := getenv("GRPC_PORT", defaultPort)
+        metricsPort := getenv("METRICS_PORT", defaultMetricsPort)
+
+        db, err := database.NewDB(databaseURL)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer db.Close()
+
+        repo := database.NewRepository(db)
+        idGen := id.NewGenerator()
+
+        receiveTaskUseCase := usecases.NewReceiveTaskToProcessUseCase(repo, idGen)
+        receiveProcessedUseCase := usecases.NewReceiveProcessedTaskUseCase(repo)
+        getTasksUseCase := usecases.NewGetTasksUseCase(repo)
+        getTaskByIDUseCase := usecases.NewGetTaskByIDUseCase(repo)
+
+        go serveHTTPMetrics(metricsPort)
+
+        server := grpc.NewServer(grpc.ForceServerCodec(taskgrpc.NewJSONCodec()))
+        taskgrpc.RegisterTaskAPIServer(server, &amp;taskgrpc.Server{
+                ReceiveTaskToProcessUseCase: receiveTaskUseCase,
+                ReceiveProcessedTaskUseCase: receiveProcessedUseCase,
+                GetTasksUseCase:             getTasksUseCase,
+                GetTaskByIDUseCase:          getTaskByIDUseCase,
+        })
+
+        listener, err := net.Listen("tcp", ":"+port)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+
+        <span class="cov0" title="0">log.Printf("task service listening on :%s", port)
+        log.Fatal(server.Serve(listener))</span>
+}
+
+func serveHTTPMetrics(port string) <span class="cov0" title="0">{
+        mux := http.NewServeMux()
+        mux.Handle("/health", healthHandler())
+        mux.Handle("/healthz", healthHandler())
+        mux.Handle("/metrics", promhttp.Handler())
+
+        server := &amp;http.Server{
+                Addr:              ":" + port,
+                Handler:           mux,
+                ReadHeaderTimeout: 5 * time.Second,
+        }
+
+        log.Printf("task service metrics listening on :%s", port)
+        if err := server.ListenAndServe(); err != nil &amp;&amp; err != http.ErrServerClosed </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+}
+
+func loadDotEnv() <span class="cov0" title="0">{
+        for _, path := range []string{".env", filepath.Join("..", ".env"), filepath.Join("..", "..", ".env")} </span><span class="cov0" title="0">{
+                if err := loadEnvFile(path); err == nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+        }
+}
+
+func loadEnvFile(path string) error <span class="cov0" title="0">{
+        data, err := os.ReadFile(path)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">for _, line := range strings.Split(string(data), "\n") </span><span class="cov0" title="0">{
+                line = strings.TrimSpace(line)
+                if line == "" || strings.HasPrefix(line, "#") </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">key, value, ok := strings.Cut(line, "=")
+                if !ok </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">_ = os.Setenv(strings.TrimSpace(key), strings.Trim(strings.TrimSpace(value), `"'`))</span>
+        }
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func getenv(key string, fallback string) string <span class="cov0" title="0">{
+        value := os.Getenv(key)
+        if value == "" </span><span class="cov0" title="0">{
+                return fallback
+        }</span>
+        <span class="cov0" title="0">return value</span>
+}
+
+func healthHandler() http.Handler <span class="cov0" title="0">{
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+                w.WriteHeader(http.StatusOK)
+                _, _ = w.Write([]byte("ok"))
+        }</span>)
+}
 </pre>
 		
 		<pre class="file" id="file1" style="display: none">package entities
@@ -132,13 +261,539 @@ func (t *Task) Validate() error <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file2" style="display: none">// Code generated by protoc-gen-go. DO NOT EDIT.
+		<pre class="file" id="file2" style="display: none">package database
+
+import (
+        "context"
+        "database/sql"
+        "time"
+
+        _ "github.com/jackc/pgx/v5/stdlib"
+)
+
+func NewDB(dsn string) (*sql.DB, error) <span class="cov0" title="0">{
+        db, err := sql.Open("pgx", dsn)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">db.SetMaxOpenConns(25)
+        db.SetMaxIdleConns(10)
+        db.SetConnMaxLifetime(30 * time.Minute)
+
+        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+
+        if err := db.PingContext(ctx); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return db, nil</span>
+}
+
+func ExecuteSQL(tx *sql.Tx, query string, args ...any) error <span class="cov8" title="1">{
+        _, err := tx.Exec(query, args...)
+        return err
+}</span>
+
+func QuerySQL(db *sql.DB, query string, args ...any) (*sql.Rows, error) <span class="cov8" title="1">{
+        rows, err := db.Query(query, args...)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return rows, nil</span>
+}
+
+func OpenTransaction(db *sql.DB) (*sql.Tx, error) <span class="cov8" title="1">{
+        tx, err := db.Begin()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov8" title="1">return tx, nil</span>
+}
+
+func RollbackTransaction(tx *sql.Tx) error <span class="cov8" title="1">{
+        if err := tx.Rollback(); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+
+func CommitTransaction(tx *sql.Tx) error <span class="cov8" title="1">{
+        if err := tx.Commit(); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov8" title="1">return nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package database
+
+import (
+        "context"
+        "database/sql"
+        "fmt"
+        "time"
+
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases"
+)
+
+const (
+        tasksTable       = "tasks"
+        outboxTable      = "task_outbox_events"
+        timeLayout       = "2006-01-02 15:04:05"
+        eventUnprocessed = "unprocessed"
+        eventProcessed   = "processed"
+)
+
+type Repository struct {
+        DB *sql.DB
+}
+
+func NewRepository(db *sql.DB) *Repository <span class="cov0" title="0">{
+        return &amp;Repository{DB: db}
+}</span>
+
+func (r *Repository) GetTasks(ctx context.Context, limit int, offset int) ([]entities.Task, error) <span class="cov0" title="0">{
+        rows, err := r.DB.QueryContext(
+                ctx,
+                fmt.Sprintf(`
+                        SELECT id, message, binary_code, created_at, updated_at
+                        FROM %s
+                        ORDER BY created_at ASC, id ASC
+                        LIMIT $1 OFFSET $2
+                `, tasksTable),
+                limit,
+                offset,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">defer rows.Close()
+
+        var tasks []entities.Task
+        for rows.Next() </span><span class="cov0" title="0">{
+                task, err := scanTask(rows)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">tasks = append(tasks, task)</span>
+        }
+        <span class="cov0" title="0">if err := rows.Err(); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return tasks, nil</span>
+}
+
+func (r *Repository) GetTaskByID(ctx context.Context, taskID string) (entities.Task, error) <span class="cov0" title="0">{
+        row := r.DB.QueryRowContext(
+                ctx,
+                fmt.Sprintf(`
+                        SELECT id, message, binary_code, created_at, updated_at
+                        FROM %s
+                        WHERE id = $1
+                `, tasksTable),
+                taskID,
+        )
+        return scanTaskRow(row)
+}</span>
+
+func (r *Repository) MoveTaskToProcessing(ctx context.Context, createTaskDto usecases.CreateTaskDTO) (entities.Task, error) <span class="cov0" title="0">{
+        tx, err := r.DB.BeginTx(ctx, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                return entities.Task{}, err
+        }</span>
+
+        <span class="cov0" title="0">now := time.Now().UTC()
+        nowString := now.Format(timeLayout)
+        task := entities.Task{
+                ID:         createTaskDto.ID,
+                Message:    createTaskDto.Message,
+                BinaryCode: "",
+                CreatedAt:  nowString,
+                UpdatedAt:  nowString,
+        }
+
+        if err := insertTask(tx, task, now); err != nil </span><span class="cov0" title="0">{
+                _ = tx.Rollback()
+                return entities.Task{}, err
+        }</span>
+
+        <span class="cov0" title="0">if err := insertEvent(tx, task, eventUnprocessed, now); err != nil </span><span class="cov0" title="0">{
+                _ = tx.Rollback()
+                return entities.Task{}, err
+        }</span>
+
+        <span class="cov0" title="0">if err := tx.Commit(); err != nil </span><span class="cov0" title="0">{
+                _ = tx.Rollback()
+                return entities.Task{}, err
+        }</span>
+
+        <span class="cov0" title="0">return task, nil</span>
+}
+
+func (r *Repository) FinishProcessing(ctx context.Context, dto usecases.FinishProcessingDTO) (entities.Task, error) <span class="cov0" title="0">{
+        tx, err := r.DB.BeginTx(ctx, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                return entities.Task{}, err
+        }</span>
+
+        <span class="cov0" title="0">now := time.Now().UTC()
+        row := tx.QueryRow(
+                fmt.Sprintf(`
+                        UPDATE %s
+                        SET binary_code = $1, updated_at = $2
+                        WHERE id = $3
+                        RETURNING id, message, binary_code, created_at, updated_at
+                `, tasksTable),
+                dto.BinaryCode,
+                now,
+                dto.ID,
+        )
+
+        task, err := scanTaskRow(row)
+        if err != nil </span><span class="cov0" title="0">{
+                _ = tx.Rollback()
+                return entities.Task{}, err
+        }</span>
+
+        <span class="cov0" title="0">if err := insertEvent(tx, task, eventProcessed, now); err != nil </span><span class="cov0" title="0">{
+                _ = tx.Rollback()
+                return entities.Task{}, err
+        }</span>
+
+        <span class="cov0" title="0">if err := tx.Commit(); err != nil </span><span class="cov0" title="0">{
+                _ = tx.Rollback()
+                return entities.Task{}, err
+        }</span>
+
+        <span class="cov0" title="0">return task, nil</span>
+}
+
+func insertTask(tx *sql.Tx, task entities.Task, now time.Time) error <span class="cov0" title="0">{
+        _, err := tx.Exec(
+                fmt.Sprintf(`
+                        INSERT INTO %s (id, message, binary_code, created_at, updated_at)
+                        VALUES ($1, $2, $3, $4, $5)
+                `, tasksTable),
+                task.ID,
+                task.Message,
+                task.BinaryCode,
+                now,
+                now,
+        )
+        return err
+}</span>
+
+func insertEvent(tx *sql.Tx, task entities.Task, status string, now time.Time) error <span class="cov0" title="0">{
+        _, err := tx.Exec(
+                fmt.Sprintf(`
+                        INSERT INTO %s (task_id, status, message, binary_code, created_at, updated_at)
+                        VALUES ($1, $2, $3, $4, $5, $6)
+                `, outboxTable),
+                task.ID,
+                status,
+                task.Message,
+                task.BinaryCode,
+                now,
+                now,
+        )
+        return err
+}</span>
+
+func scanTask(rows *sql.Rows) (entities.Task, error) <span class="cov0" title="0">{
+        var task entities.Task
+        var createdAt time.Time
+        var updatedAt time.Time
+        if err := rows.Scan(&amp;task.ID, &amp;task.Message, &amp;task.BinaryCode, &amp;createdAt, &amp;updatedAt); err != nil </span><span class="cov0" title="0">{
+                return entities.Task{}, err
+        }</span>
+        <span class="cov0" title="0">task.CreatedAt = createdAt.Format(timeLayout)
+        task.UpdatedAt = updatedAt.Format(timeLayout)
+        return task, nil</span>
+}
+
+func scanTaskRow(row *sql.Row) (entities.Task, error) <span class="cov0" title="0">{
+        var task entities.Task
+        var createdAt time.Time
+        var updatedAt time.Time
+        if err := row.Scan(&amp;task.ID, &amp;task.Message, &amp;task.BinaryCode, &amp;createdAt, &amp;updatedAt); err != nil </span><span class="cov0" title="0">{
+                return entities.Task{}, err
+        }</span>
+        <span class="cov0" title="0">task.CreatedAt = createdAt.Format(timeLayout)
+        task.UpdatedAt = updatedAt.Format(timeLayout)
+        return task, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package grpc
+
+import (
+        "context"
+        "encoding/json"
+        "io"
+
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/usecases"
+        "google.golang.org/grpc"
+        "google.golang.org/grpc/encoding"
+)
+
+type jsonCodec struct{}
+
+func (jsonCodec) Marshal(v interface{}) ([]byte, error) <span class="cov0" title="0">{
+        return json.Marshal(v)
+}</span>
+
+func (jsonCodec) Unmarshal(data []byte, v interface{}) error <span class="cov0" title="0">{
+        return json.Unmarshal(data, v)
+}</span>
+
+func (jsonCodec) Name() string <span class="cov0" title="0">{
+        return "json"
+}</span>
+
+func init() <span class="cov0" title="0">{
+        encoding.RegisterCodec(jsonCodec{})
+}</span>
+
+func NewJSONCodec() encoding.Codec <span class="cov0" title="0">{
+        return jsonCodec{}
+}</span>
+
+type TaskRecord struct {
+        ID         string `json:"id"`
+        Message    string `json:"message"`
+        BinaryCode string `json:"binaryCode"`
+        CreatedAt  string `json:"createdAt"`
+        UpdatedAt  string `json:"updatedAt"`
+}
+
+type ReceiveTaskRequest struct {
+        Message string `json:"message"`
+}
+
+type ReceiveTaskResponse struct {
+        Tasks []TaskRecord `json:"tasks"`
+}
+
+type ProcessedTaskRequest struct {
+        ID         string `json:"id"`
+        BinaryCode string `json:"binaryCode"`
+}
+
+type ProcessedTaskResponse struct {
+        Success bool `json:"success"`
+}
+
+type TaskListRequest struct {
+        Limit  int `json:"limit"`
+        Offset int `json:"offset"`
+}
+
+type TaskListResponse struct {
+        Tasks []TaskRecord `json:"tasks"`
+}
+
+type TaskByIDRequest struct {
+        ID string `json:"id"`
+}
+
+type TaskByIDResponse struct {
+        Task TaskRecord `json:"task"`
+}
+
+type Server struct {
+        ReceiveTaskToProcessUseCase *usecases.ReceiveTaskToProcessUseCase
+        ReceiveProcessedTaskUseCase *usecases.ReceiveProcessedTaskUseCase
+        GetTasksUseCase             *usecases.GetTasksUseCase
+        GetTaskByIDUseCase          *usecases.GetTaskByIDUseCase
+}
+
+type taskServiceHandler interface{}
+
+func RegisterTaskAPIServer(s grpc.ServiceRegistrar, srv *Server) <span class="cov0" title="0">{
+        s.RegisterService(&amp;grpc.ServiceDesc{
+                ServiceName: "task.TaskService",
+                HandlerType: (*taskServiceHandler)(nil),
+                Methods: []grpc.MethodDesc{
+                        {
+                                MethodName: "GetTasks",
+                                Handler:    taskServiceGetTasksHandler,
+                        },
+                        {
+                                MethodName: "GetTaskByID",
+                                Handler:    taskServiceGetTaskByIDHandler,
+                        },
+                },
+                Streams: []grpc.StreamDesc{
+                        {
+                                StreamName:    "ReceiveTaskToProcess",
+                                Handler:       taskServiceReceiveTaskHandler,
+                                ClientStreams: true,
+                        },
+                        {
+                                StreamName:    "SendProcessedTask",
+                                Handler:       taskServiceSendProcessedTaskHandler,
+                                ClientStreams: true,
+                        },
+                },
+                Metadata: "task.proto",
+        }, srv)
+}</span>
+
+func taskServiceReceiveTaskHandler(srv interface{}, stream grpc.ServerStream) error <span class="cov0" title="0">{
+        server := srv.(*Server)
+        var tasks []TaskRecord
+        ctx := stream.Context()
+
+        for </span><span class="cov0" title="0">{
+                req := new(ReceiveTaskRequest)
+                if err := stream.RecvMsg(req); err != nil </span><span class="cov0" title="0">{
+                        if err == io.EOF </span><span class="cov0" title="0">{
+                                break</span>
+                        }
+                        <span class="cov0" title="0">return err</span>
+                }
+
+                <span class="cov0" title="0">output, err := server.ReceiveTaskToProcessUseCase.Execute(&amp;usecases.ReceiveTaskToProcessInput{
+                        Ctx:     ctx,
+                        Message: req.Message,
+                })
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov0" title="0">tasks = append(tasks, mapTask(output.Task))</span>
+        }
+
+        <span class="cov0" title="0">return stream.SendMsg(&amp;ReceiveTaskResponse{Tasks: tasks})</span>
+}
+
+func taskServiceSendProcessedTaskHandler(srv interface{}, stream grpc.ServerStream) error <span class="cov0" title="0">{
+        server := srv.(*Server)
+        success := true
+        ctx := stream.Context()
+
+        for </span><span class="cov0" title="0">{
+                req := new(ProcessedTaskRequest)
+                if err := stream.RecvMsg(req); err != nil </span><span class="cov0" title="0">{
+                        if err == io.EOF </span><span class="cov0" title="0">{
+                                break</span>
+                        }
+                        <span class="cov0" title="0">return err</span>
+                }
+
+                <span class="cov0" title="0">_, err := server.ReceiveProcessedTaskUseCase.Execute(&amp;usecases.ReceiveProcessedTaskInput{
+                        Ctx:        ctx,
+                        ID:         req.ID,
+                        BinaryCode: req.BinaryCode,
+                })
+                if err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+        }
+
+        <span class="cov0" title="0">return stream.SendMsg(&amp;ProcessedTaskResponse{Success: success})</span>
+}
+
+func taskServiceGetTasksHandler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) <span class="cov0" title="0">{
+        in := new(TaskListRequest)
+        if err := dec(in); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if interceptor == nil </span><span class="cov0" title="0">{
+                output, err := srv.(*Server).GetTasksUseCase.Execute(&amp;usecases.GetTasksInput{
+                        Ctx:    ctx,
+                        Limit:  in.Limit,
+                        Offset: in.Offset,
+                })
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">return &amp;TaskListResponse{Tasks: mapTasks(output.Tasks)}, nil</span>
+        }
+
+        <span class="cov0" title="0">info := &amp;grpc.UnaryServerInfo{
+                Server:     srv,
+                FullMethod: "/task.TaskService/GetTasks",
+        }
+        handler := func(ctx context.Context, req interface{}) (interface{}, error) </span><span class="cov0" title="0">{
+                output, err := srv.(*Server).GetTasksUseCase.Execute(&amp;usecases.GetTasksInput{
+                        Ctx:    ctx,
+                        Limit:  req.(*TaskListRequest).Limit,
+                        Offset: req.(*TaskListRequest).Offset,
+                })
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">return &amp;TaskListResponse{Tasks: mapTasks(output.Tasks)}, nil</span>
+        }
+        <span class="cov0" title="0">return interceptor(ctx, in, info, handler)</span>
+}
+
+func taskServiceGetTaskByIDHandler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) <span class="cov0" title="0">{
+        in := new(TaskByIDRequest)
+        if err := dec(in); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if interceptor == nil </span><span class="cov0" title="0">{
+                output, err := srv.(*Server).GetTaskByIDUseCase.Execute(&amp;usecases.GetTaskByIDInput{
+                        Ctx: ctx,
+                        ID:  in.ID,
+                })
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">return &amp;TaskByIDResponse{Task: mapTask(output.Task)}, nil</span>
+        }
+
+        <span class="cov0" title="0">info := &amp;grpc.UnaryServerInfo{
+                Server:     srv,
+                FullMethod: "/task.TaskService/GetTaskByID",
+        }
+        handler := func(ctx context.Context, req interface{}) (interface{}, error) </span><span class="cov0" title="0">{
+                output, err := srv.(*Server).GetTaskByIDUseCase.Execute(&amp;usecases.GetTaskByIDInput{
+                        Ctx: ctx,
+                        ID:  req.(*TaskByIDRequest).ID,
+                })
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov0" title="0">return &amp;TaskByIDResponse{Task: mapTask(output.Task)}, nil</span>
+        }
+        <span class="cov0" title="0">return interceptor(ctx, in, info, handler)</span>
+}
+
+func mapTask(task entities.Task) TaskRecord <span class="cov0" title="0">{
+        return TaskRecord{
+                ID:         task.ID,
+                Message:    task.Message,
+                BinaryCode: task.BinaryCode,
+                CreatedAt:  task.CreatedAt,
+                UpdatedAt:  task.UpdatedAt,
+        }
+}</span>
+
+func mapTasks(tasks []entities.Task) []TaskRecord <span class="cov0" title="0">{
+        mapped := make([]TaskRecord, 0, len(tasks))
+        for _, task := range tasks </span><span class="cov0" title="0">{
+                mapped = append(mapped, mapTask(task))
+        }</span>
+        <span class="cov0" title="0">return mapped</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">// Code generated by protoc-gen-go. DO NOT EDIT.
 // versions:
 //         protoc-gen-go v1.36.11
 //         protoc        v3.12.4
 // source: task.proto
 
-package task
+package grpc
 
 import (
         protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -449,7 +1104,7 @@ const file_task_proto_rawDesc = "" +
         "\vTaskService\x12a\n" +
         "\x14ReceiveTaskToProcess\x12!.task.ReceiveTaskToProcessRequest\x1a\".task.ReceiveTaskToProcessResponse\"\x00(\x01\x12X\n" +
         "\x11SendProcessedTask\x12\x1e.task.SendProcessedTaskRequest\x1a\x1f.task.SendProcessedTaskResponse\"\x00(\x01\x12;\n" +
-        "\bGetTasks\x12\x15.task.GetTasksRequest\x1a\x16.task.GetTasksResponse\"\x00BSZQgithub.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task;taskb\x06proto3"
+        "\bGetTasks\x12\x15.task.GetTasksRequest\x1a\x16.task.GetTasksResponse\"\x00B\\ZZgithub.com/douglasvolcato/binary-code-processor/task_service/internal/infra/grpc/task;taskb\x06proto3"
 
 var (
         file_task_proto_rawDescOnce sync.Once
@@ -511,13 +1166,13 @@ func file_task_proto_init() <span class="cov0" title="0">{
 }
 </pre>
 		
-		<pre class="file" id="file3" style="display: none">// Code generated by protoc-gen-go-grpc. DO NOT EDIT.
+		<pre class="file" id="file6" style="display: none">// Code generated by protoc-gen-go-grpc. DO NOT EDIT.
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v3.12.4
 // source: task.proto
 
-package task
+package grpc
 
 import (
         context "context"
@@ -697,9 +1352,49 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 }
 </pre>
 		
-		<pre class="file" id="file4" style="display: none">package usecases
+		<pre class="file" id="file7" style="display: none">package id
 
-import "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+import (
+        "crypto/rand"
+        "encoding/hex"
+        "strings"
+)
+
+type Generator struct{}
+
+func NewGenerator() *Generator <span class="cov0" title="0">{
+        return &amp;Generator{}
+}</span>
+
+func (g *Generator) GenerateID() string <span class="cov0" title="0">{
+        buf := make([]byte, 16)
+        if _, err := rand.Read(buf); err != nil </span><span class="cov0" title="0">{
+                return ""
+        }</span>
+
+        <span class="cov0" title="0">buf[6] = (buf[6] &amp; 0x0f) | 0x40
+        buf[8] = (buf[8] &amp; 0x3f) | 0x80
+
+        hexValue := hex.EncodeToString(buf)
+        parts := []string{
+                hexValue[0:8],
+                hexValue[8:12],
+                hexValue[12:16],
+                hexValue[16:20],
+                hexValue[20:32],
+        }
+        return strings.Join(parts, "-")</span>
+}
+
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package usecases
+
+import (
+        "context"
+
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+)
 
 type GetTaskByIDUseCase struct {
         Repo TaskRepositoryInterface
@@ -712,7 +1407,8 @@ func NewGetTaskByIDUseCase(repo TaskRepositoryInterface) *GetTaskByIDUseCase <sp
 }</span>
 
 type GetTaskByIDInput struct {
-        ID string
+        Ctx context.Context
+        ID  string
 }
 
 type GetTaskByIDOutput struct {
@@ -720,7 +1416,11 @@ type GetTaskByIDOutput struct {
 }
 
 func (u *GetTaskByIDUseCase) Execute(input *GetTaskByIDInput) (*GetTaskByIDOutput, error) <span class="cov8" title="1">{
-        task, err := u.Repo.GetTaskByID(input.ID)
+        ctx := input.Ctx
+        if ctx == nil </span><span class="cov0" title="0">{
+                ctx = context.Background()
+        }</span>
+        <span class="cov8" title="1">task, err := u.Repo.GetTaskByID(ctx, input.ID)
         if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
@@ -730,9 +1430,13 @@ func (u *GetTaskByIDUseCase) Execute(input *GetTaskByIDInput) (*GetTaskByIDOutpu
 }
 </pre>
 		
-		<pre class="file" id="file5" style="display: none">package usecases
+		<pre class="file" id="file9" style="display: none">package usecases
 
-import "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+import (
+        "context"
+
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+)
 
 type GetTasksUseCase struct {
         Repo TaskRepositoryInterface
@@ -745,6 +1449,7 @@ func NewGetTasksUseCase(repo TaskRepositoryInterface) *GetTasksUseCase <span cla
 }</span>
 
 type GetTasksInput struct {
+        Ctx    context.Context
         Limit  int
         Offset int
 }
@@ -754,7 +1459,11 @@ type GetTasksOutput struct {
 }
 
 func (u *GetTasksUseCase) Execute(input *GetTasksInput) (*GetTasksOutput, error) <span class="cov8" title="1">{
-        tasks, err := u.Repo.GetTasks(input.Limit, input.Offset)
+        ctx := input.Ctx
+        if ctx == nil </span><span class="cov0" title="0">{
+                ctx = context.Background()
+        }</span>
+        <span class="cov8" title="1">tasks, err := u.Repo.GetTasks(ctx, input.Limit, input.Offset)
         if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
@@ -764,22 +1473,28 @@ func (u *GetTasksUseCase) Execute(input *GetTasksInput) (*GetTasksOutput, error)
 }
 </pre>
 		
-		<pre class="file" id="file6" style="display: none">package usecases
+		<pre class="file" id="file10" style="display: none">package usecases
+
+import (
+        "context"
+        "errors"
+        "strings"
+)
 
 type ReceiveProcessedTaskUseCase struct {
-        Repo   TaskProcessorInterface
-        Outbox TaskOutboxRepositoryInterface
+        Repo TaskProcessorInterface
 }
 
-func NewReceiveProcessedTaskUseCase(repo TaskProcessorInterface, outbox TaskOutboxRepositoryInterface) *ReceiveProcessedTaskUseCase <span class="cov8" title="1">{
+func NewReceiveProcessedTaskUseCase(repo TaskProcessorInterface) *ReceiveProcessedTaskUseCase <span class="cov8" title="1">{
         return &amp;ReceiveProcessedTaskUseCase{
-                Repo:   repo,
-                Outbox: outbox,
+                Repo: repo,
         }
 }</span>
 
 type ReceiveProcessedTaskInput struct {
-        ID string
+        Ctx        context.Context
+        ID         string
+        BinaryCode string
 }
 
 type ReceiveProcessedTaskOutput struct {
@@ -787,11 +1502,25 @@ type ReceiveProcessedTaskOutput struct {
 }
 
 func (u *ReceiveProcessedTaskUseCase) Execute(input *ReceiveProcessedTaskInput) (*ReceiveProcessedTaskOutput, error) <span class="cov8" title="1">{
-        task, err := u.Repo.SetTaskAsProcessed(input.ID)
-        if err != nil </span><span class="cov8" title="1">{
-                return nil, err
+        taskID := strings.TrimSpace(input.ID)
+        binaryCode := strings.TrimSpace(input.BinaryCode)
+        if taskID == "" </span><span class="cov0" title="0">{
+                return nil, errors.New("task id is empty")
         }</span>
-        <span class="cov8" title="1">if err := u.Outbox.StoreProcessedEvent(task); err != nil </span><span class="cov0" title="0">{
+        <span class="cov8" title="1">if binaryCode == "" </span><span class="cov0" title="0">{
+                return nil, errors.New("binary code is empty")
+        }</span>
+
+        <span class="cov8" title="1">ctx := input.Ctx
+        if ctx == nil </span><span class="cov0" title="0">{
+                ctx = context.Background()
+        }</span>
+
+        <span class="cov8" title="1">_, err := u.Repo.FinishProcessing(ctx, FinishProcessingDTO{
+                ID:         taskID,
+                BinaryCode: binaryCode,
+        })
+        if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
         <span class="cov8" title="1">return &amp;ReceiveProcessedTaskOutput{
@@ -800,25 +1529,30 @@ func (u *ReceiveProcessedTaskUseCase) Execute(input *ReceiveProcessedTaskInput) 
 }
 </pre>
 		
-		<pre class="file" id="file7" style="display: none">package usecases
+		<pre class="file" id="file11" style="display: none">package usecases
 
-import "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+import (
+        "context"
+        "errors"
+        "strings"
+
+        "github.com/douglasvolcato/binary-code-processor/task_service/internal/entities"
+)
 
 type ReceiveTaskToProcessUseCase struct {
-        Repo     TaskProcessorInterface
-        Outbox   TaskOutboxRepositoryInterface
-        IDGen    IDGeneratorInterface
+        Repo  TaskProcessorInterface
+        IDGen IDGeneratorInterface
 }
 
-func NewReceiveTaskToProcessUseCase(repo TaskProcessorInterface, outbox TaskOutboxRepositoryInterface, idGen IDGeneratorInterface) *ReceiveTaskToProcessUseCase <span class="cov8" title="1">{
+func NewReceiveTaskToProcessUseCase(repo TaskProcessorInterface, idGen IDGeneratorInterface) *ReceiveTaskToProcessUseCase <span class="cov8" title="1">{
         return &amp;ReceiveTaskToProcessUseCase{
-                Repo:   repo,
-                Outbox: outbox,
-                IDGen:  idGen,
+                Repo:  repo,
+                IDGen: idGen,
         }
 }</span>
 
 type ReceiveTaskToProcessInput struct {
+        Ctx     context.Context
         Message string
 }
 
@@ -828,15 +1562,21 @@ type ReceiveTaskToProcessOutput struct {
 }
 
 func (u *ReceiveTaskToProcessUseCase) Execute(input *ReceiveTaskToProcessInput) (*ReceiveTaskToProcessOutput, error) <span class="cov8" title="1">{
-        createTaskDto := CreateTaskDTO{
-                ID:      u.IDGen.GenerateID(),
-                Message: input.Message,
-        }
-        task, err := u.Repo.MoveTaskToProcessing(createTaskDto)
-        if err != nil </span><span class="cov8" title="1">{
-                return nil, err
+        message := strings.TrimSpace(input.Message)
+        if message == "" </span><span class="cov0" title="0">{
+                return nil, errors.New("message is empty")
         }</span>
-        <span class="cov8" title="1">if err := u.Outbox.StoreUnprocessedEvent(task); err != nil </span><span class="cov0" title="0">{
+        <span class="cov8" title="1">ctx := input.Ctx
+        if ctx == nil </span><span class="cov0" title="0">{
+                ctx = context.Background()
+        }</span>
+
+        <span class="cov8" title="1">createTaskDto := CreateTaskDTO{
+                ID:      u.IDGen.GenerateID(),
+                Message: message,
+        }
+        task, err := u.Repo.MoveTaskToProcessing(ctx, createTaskDto)
+        if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
         <span class="cov8" title="1">return &amp;ReceiveTaskToProcessOutput{
@@ -846,7 +1586,7 @@ func (u *ReceiveTaskToProcessUseCase) Execute(input *ReceiveTaskToProcessInput) 
 }
 </pre>
 		
-		<pre class="file" id="file8" style="display: none">package test
+		<pre class="file" id="file12" style="display: none">package test
 
 import (
         "github.com/go-faker/faker/v4"

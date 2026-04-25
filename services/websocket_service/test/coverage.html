@@ -59,9 +59,15 @@
 				
 				<option value="file1">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities/task_entity.go (100.0%)</option>
 				
-				<option value="file2">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/usecases/send_processed_tasks_usecase.go (100.0%)</option>
+				<option value="file2">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/infra/queue/consumer.go (0.0%)</option>
 				
-				<option value="file3">github.com/douglasvolcato/binary-code-processor/websocket_service/test/faker.go (0.0%)</option>
+				<option value="file3">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/infra/queue/producer.go (0.0%)</option>
+				
+				<option value="file4">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/infra/websocket/hub.go (0.0%)</option>
+				
+				<option value="file5">github.com/douglasvolcato/binary-code-processor/websocket_service/internal/usecases/send_processed_tasks_usecase.go (100.0%)</option>
+				
+				<option value="file6">github.com/douglasvolcato/binary-code-processor/websocket_service/test/faker.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -77,7 +83,149 @@
 		
 		<pre class="file" id="file0" style="display: none">package main
 
-func main() {<span class="cov0" title="0">}</span>
+import (
+        "encoding/json"
+        "log"
+        "net/http"
+        "os"
+        "path/filepath"
+        "strings"
+        "time"
+
+        "github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities"
+        "github.com/douglasvolcato/binary-code-processor/websocket_service/internal/infra/queue"
+        ws "github.com/douglasvolcato/binary-code-processor/websocket_service/internal/infra/websocket"
+        "github.com/douglasvolcato/binary-code-processor/websocket_service/internal/usecases"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+)
+
+const defaultRabbitURL = "amqp://guest:guest@localhost:5672/"
+const defaultQueueName = "task.websocket"
+const defaultExchangeName = "task.processed"
+const defaultPort = "8082"
+
+type eventMessage struct {
+        ID         string `json:"id"`
+        BinaryCode string `json:"binaryCode"`
+}
+
+func main() <span class="cov0" title="0">{
+        loadDotEnv()
+
+        rabbitURL := getenv("RABBITMQ_URL", defaultRabbitURL)
+        queueName := getenv("WEBSOCKET_QUEUE", defaultQueueName)
+        exchangeName := getenv("WEBSOCKET_EXCHANGE", defaultExchangeName)
+        port := getenv("WEBSOCKET_PORT", defaultPort)
+
+        hub := ws.NewHub()
+        usecase := usecases.NewSendProcessedTasksUseCase(hub)
+
+        go func() </span><span class="cov0" title="0">{
+                for </span><span class="cov0" title="0">{
+                        if err := runBrokerConsumer(rabbitURL, queueName, exchangeName, usecase); err != nil </span><span class="cov0" title="0">{
+                                log.Printf("websocket broker loop: %v", err)
+                                time.Sleep(3 * time.Second)
+                                continue</span>
+                        }
+                        <span class="cov0" title="0">return</span>
+                }
+        }()
+
+        <span class="cov0" title="0">mux := http.NewServeMux()
+        mux.Handle("/ws", hub)
+        mux.Handle("/health", healthHandler())
+        mux.Handle("/healthz", healthHandler())
+        mux.Handle("/metrics", promhttp.Handler())
+
+        server := &amp;http.Server{
+                Addr:              ":" + port,
+                Handler:           mux,
+                ReadHeaderTimeout: 5 * time.Second,
+                IdleTimeout:       60 * time.Second,
+        }
+
+        log.Printf("websocket service listening on :%s", port)
+        log.Fatal(server.ListenAndServe())</span>
+}
+
+func runBrokerConsumer(rabbitURL, queueName, exchangeName string, usecase *usecases.SendProcessedTasksUseCase) error <span class="cov0" title="0">{
+        consumer, err := queue.NewConsumer(rabbitURL)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">defer consumer.Close()
+
+        if err := consumer.DeclareQueue(queueName); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">if err := consumer.DeclareExchange(exchangeName, "fanout"); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">if err := consumer.BindQueueToExchange(queueName, exchangeName); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+        <span class="cov0" title="0">if err := consumer.Consume(queueName, func(payload []byte) error </span><span class="cov0" title="0">{
+                var msg eventMessage
+                if err := json.Unmarshal(payload, &amp;msg); err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+                <span class="cov0" title="0">_, err := usecase.Execute(&amp;usecases.SendProcessedTasksInput{
+                        Task: entities.Task{
+                                ID:         strings.TrimSpace(msg.ID),
+                                BinaryCode: strings.TrimSpace(msg.BinaryCode),
+                        },
+                })
+                return err</span>
+        }); err != nil <span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">select </span>{}
+}
+
+func loadDotEnv() <span class="cov0" title="0">{
+        for _, path := range []string{".env", filepath.Join("..", ".env"), filepath.Join("..", "..", ".env")} </span><span class="cov0" title="0">{
+                if err := loadEnvFile(path); err == nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+        }
+}
+
+func loadEnvFile(path string) error <span class="cov0" title="0">{
+        data, err := os.ReadFile(path)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">for _, line := range strings.Split(string(data), "\n") </span><span class="cov0" title="0">{
+                line = strings.TrimSpace(line)
+                if line == "" || strings.HasPrefix(line, "#") </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">key, value, ok := strings.Cut(line, "=")
+                if !ok </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">_ = os.Setenv(strings.TrimSpace(key), strings.Trim(strings.TrimSpace(value), `"'`))</span>
+        }
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func getenv(key string, fallback string) string <span class="cov0" title="0">{
+        value := os.Getenv(key)
+        if value == "" </span><span class="cov0" title="0">{
+                return fallback
+        }</span>
+        <span class="cov0" title="0">return value</span>
+}
+
+func healthHandler() http.Handler <span class="cov0" title="0">{
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+                w.WriteHeader(http.StatusOK)
+                _, _ = w.Write([]byte("ok"))
+        }</span>)
+}
 </pre>
 		
 		<pre class="file" id="file1" style="display: none">package entities
@@ -110,7 +258,344 @@ func (t *Task) Validate() error <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file2" style="display: none">package usecases
+		<pre class="file" id="file2" style="display: none">package queue
+
+import (
+        "log"
+
+        "github.com/rabbitmq/amqp091-go"
+)
+
+type Consumer struct {
+        conn    *amqp091.Connection
+        channel *amqp091.Channel
+}
+
+func NewConsumer(url string) (*Consumer, error) <span class="cov0" title="0">{
+        conn, err := amqp091.Dial(url)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">ch, err := conn.Channel()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return &amp;Consumer{
+                conn:    conn,
+                channel: ch,
+        }, nil</span>
+}
+
+func (c *Consumer) DeclareQueue(name string) error <span class="cov0" title="0">{
+        _, err := c.channel.QueueDeclare(
+                name,
+                true,
+                false,
+                false,
+                false,
+                nil,
+        )
+        return err
+}</span>
+
+func (c *Consumer) DeclareExchange(name string, kind string) error <span class="cov0" title="0">{
+        return c.channel.ExchangeDeclare(
+                name,
+                kind,
+                true,
+                false,
+                false,
+                false,
+                nil,
+        )
+}</span>
+
+func (c *Consumer) BindQueueToExchange(queue string, exchange string) error <span class="cov0" title="0">{
+        return c.channel.QueueBind(
+                queue,
+                "",
+                exchange,
+                false,
+                nil,
+        )
+}</span>
+
+func (c *Consumer) Consume(queue string, handler func([]byte) error) error <span class="cov0" title="0">{
+
+        err := c.channel.Qos(1, 0, false)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">msgs, err := c.channel.Consume(
+                queue,
+                "",
+                false, // manual ack
+                false,
+                false,
+                false,
+                nil,
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">go func() </span><span class="cov0" title="0">{
+                for msg := range msgs </span><span class="cov0" title="0">{
+                        err := handler(msg.Body)
+
+                        if err != nil </span><span class="cov0" title="0">{
+                                log.Println("erro ao processar:", err)
+                                msg.Nack(false, true) // requeue
+                        }</span> else<span class="cov0" title="0"> {
+                                msg.Ack(false)
+                        }</span>
+                }
+        }()
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func (c *Consumer) Close() <span class="cov0" title="0">{
+        if c.channel != nil </span><span class="cov0" title="0">{
+                c.channel.Close()
+        }</span>
+        <span class="cov0" title="0">if c.conn != nil </span><span class="cov0" title="0">{
+                c.conn.Close()
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package queue
+
+import (
+        "encoding/json"
+
+        "github.com/rabbitmq/amqp091-go"
+)
+
+type Producer struct {
+        conn    *amqp091.Connection
+        channel *amqp091.Channel
+}
+
+func NewProducer(url string) (*Producer, error) <span class="cov0" title="0">{
+        conn, err := amqp091.Dial(url)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">ch, err := conn.Channel()
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return &amp;Producer{
+                conn:    conn,
+                channel: ch,
+        }, nil</span>
+}
+
+func (p *Producer) DeclareQueue(name string) error <span class="cov0" title="0">{
+        _, err := p.channel.QueueDeclare(
+                name,
+                true,  // durable
+                false, // auto-delete
+                false, // exclusive
+                false,
+                nil,
+        )
+        return err
+}</span>
+
+func (p *Producer) DeclareExchange(name string, kind string) error <span class="cov0" title="0">{
+        return p.channel.ExchangeDeclare(
+                name,
+                kind,
+                true,
+                false,
+                false,
+                false,
+                nil,
+        )
+}</span>
+
+func (p *Producer) Publish(queue string, payload interface{}) error <span class="cov0" title="0">{
+        body, err := json.Marshal(payload)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">return p.channel.Publish(
+                "",
+                queue,
+                false,
+                false,
+                amqp091.Publishing{
+                        ContentType: "application/json",
+                        Body:        body,
+                },
+        )</span>
+}
+
+func (p *Producer) PublishToExchange(exchange string, routingKey string, payload interface{}) error <span class="cov0" title="0">{
+        body, err := json.Marshal(payload)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">return p.channel.Publish(
+                exchange,
+                routingKey,
+                false,
+                false,
+                amqp091.Publishing{
+                        ContentType: "application/json",
+                        Body:        body,
+                },
+        )</span>
+}
+
+func (p *Producer) Close() <span class="cov0" title="0">{
+        if p.channel != nil </span><span class="cov0" title="0">{
+                p.channel.Close()
+        }</span>
+        <span class="cov0" title="0">if p.conn != nil </span><span class="cov0" title="0">{
+                p.conn.Close()
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package websocket
+
+import (
+        "net/http"
+        "sync"
+
+        "github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities"
+        "github.com/gorilla/websocket"
+        "github.com/prometheus/client_golang/prometheus"
+)
+
+type Hub struct {
+        mu       sync.RWMutex
+        clients  map[*websocket.Conn]*clientState
+        upgrader websocket.Upgrader
+}
+
+var (
+        websocketConnectionsActive = prometheus.NewGauge(prometheus.GaugeOpts{
+                Name: "websocket_connections_active",
+                Help: "Number of active WebSocket connections.",
+        })
+        registerMetricsOnce sync.Once
+)
+
+type clientState struct {
+        conn      *websocket.Conn
+        writeMu   sync.Mutex
+        closeOnce sync.Once
+}
+
+func NewHub() *Hub <span class="cov0" title="0">{
+        registerMetricsOnce.Do(func() </span><span class="cov0" title="0">{
+                prometheus.MustRegister(websocketConnectionsActive)
+        }</span>)
+
+        <span class="cov0" title="0">return &amp;Hub{
+                clients: make(map[*websocket.Conn]*clientState),
+                upgrader: websocket.Upgrader{
+                        CheckOrigin: func(r *http.Request) bool </span><span class="cov0" title="0">{ return true }</span>,
+                },
+        }
+}
+
+func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        conn, err := h.upgrader.Upgrade(w, r, nil)
+        if err != nil </span><span class="cov0" title="0">{
+                http.Error(w, err.Error(), http.StatusBadRequest)
+                return
+        }</span>
+
+        <span class="cov0" title="0">state := &amp;clientState{conn: conn}
+
+        h.mu.Lock()
+        h.clients[conn] = state
+        h.mu.Unlock()
+        websocketConnectionsActive.Inc()
+
+        go h.readLoop(state)</span>
+}
+
+func (h *Hub) readLoop(state *clientState) <span class="cov0" title="0">{
+        defer state.close(h)
+
+        for </span><span class="cov0" title="0">{
+                if _, _, err := state.conn.ReadMessage(); err != nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+        }
+}
+
+func (h *Hub) SendProcessedTasksToClient(task entities.Task) error <span class="cov0" title="0">{
+        if err := task.Validate(); err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">h.mu.RLock()
+        clients := make([]*clientState, 0, len(h.clients))
+        for _, state := range h.clients </span><span class="cov0" title="0">{
+                clients = append(clients, state)
+        }</span>
+        <span class="cov0" title="0">h.mu.RUnlock()
+
+        for _, state := range clients </span><span class="cov0" title="0">{
+                state.writeMu.Lock()
+                if err := state.conn.WriteJSON(taskPayload{
+                        ID:         task.ID,
+                        BinaryCode: task.BinaryCode,
+                }); err != nil </span><span class="cov0" title="0">{
+                        state.writeMu.Unlock()
+                        state.close(h)
+                        continue</span>
+                }
+                <span class="cov0" title="0">state.writeMu.Unlock()</span>
+        }
+        <span class="cov0" title="0">return nil</span>
+}
+
+type taskPayload struct {
+        ID         string `json:"id"`
+        BinaryCode string `json:"binaryCode"`
+}
+
+func (h *Hub) Close() <span class="cov0" title="0">{
+        h.mu.RLock()
+        clients := make([]*clientState, 0, len(h.clients))
+        for _, state := range h.clients </span><span class="cov0" title="0">{
+                clients = append(clients, state)
+        }</span>
+        <span class="cov0" title="0">h.mu.RUnlock()
+
+        for _, state := range clients </span><span class="cov0" title="0">{
+                state.close(h)
+        }</span>
+}
+
+func (s *clientState) close(h *Hub) <span class="cov0" title="0">{
+        s.closeOnce.Do(func() </span><span class="cov0" title="0">{
+                h.mu.Lock()
+                delete(h.clients, s.conn)
+                h.mu.Unlock()
+                websocketConnectionsActive.Dec()
+                _ = s.conn.Close()
+        }</span>)
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">package usecases
 
 import "github.com/douglasvolcato/binary-code-processor/websocket_service/internal/entities"
 
@@ -139,7 +624,7 @@ func (u *SendProcessedTasksUseCase) Execute(input *SendProcessedTasksInput) (*Se
 }
 </pre>
 		
-		<pre class="file" id="file3" style="display: none">package test
+		<pre class="file" id="file6" style="display: none">package test
 
 import (
         "github.com/go-faker/faker/v4"

@@ -59,15 +59,23 @@
 				
 				<option value="file1">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities/task_entity.go (100.0%)</option>
 				
-				<option value="file2">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task.pb.go (0.0%)</option>
+				<option value="file2">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/graphql/generated.go (0.0%)</option>
 				
-				<option value="file3">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task_grpc.pb.go (0.0%)</option>
+				<option value="file3">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/graphql/schema.resolvers.go (0.0%)</option>
 				
-				<option value="file4">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/get_tasks_usecase.go (100.0%)</option>
+				<option value="file4">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/client.go (0.0%)</option>
 				
-				<option value="file5">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/send_task_to_process_usecase.go (100.0%)</option>
+				<option value="file5">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task.pb.go (0.0%)</option>
 				
-				<option value="file6">github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go (0.0%)</option>
+				<option value="file6">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task_grpc.pb.go (0.0%)</option>
+				
+				<option value="file7">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/web/server.go (0.0%)</option>
+				
+				<option value="file8">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/get_tasks_usecase.go (90.0%)</option>
+				
+				<option value="file9">github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases/send_task_to_process_usecase.go (87.5%)</option>
+				
+				<option value="file10">github.com/douglasvolcato/binary-code-processor/api_gateway/test/faker.go (0.0%)</option>
 				
 				</select>
 			</div>
@@ -83,7 +91,134 @@
 		
 		<pre class="file" id="file0" style="display: none">package main
 
-func main() {<span class="cov0" title="0">}</span>
+import (
+        "context"
+        "log"
+        "net/http"
+        "os"
+        "path/filepath"
+        "strings"
+        "time"
+
+        "github.com/99designs/gqlgen/graphql/handler"
+        "github.com/99designs/gqlgen/graphql/handler/extension"
+        "github.com/99designs/gqlgen/graphql/handler/lru"
+        "github.com/99designs/gqlgen/graphql/handler/transport"
+        "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/graphql"
+        gatewaygrpc "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc"
+        "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/web"
+        "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases"
+        "github.com/prometheus/client_golang/prometheus/promhttp"
+        "github.com/vektah/gqlparser/v2/ast"
+        "google.golang.org/grpc"
+        "google.golang.org/grpc/credentials/insecure"
+)
+
+const defaultPort = "8080"
+const defaultTaskServiceAddr = "127.0.0.1:50051"
+
+func main() <span class="cov0" title="0">{
+        loadDotEnv()
+
+        port := getenv("API_GATEWAY_PORT", defaultPort)
+        taskServiceAddr := getenv("TASK_SERVICE_ADDR", defaultTaskServiceAddr)
+        websocketURL := getenv("WEBSOCKET_URL", "")
+        websocketPort := getenv("WEBSOCKET_PORT", "8082")
+
+        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+
+        conn, err := grpc.DialContext(ctx, taskServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+        <span class="cov0" title="0">defer conn.Close()
+
+        client := gatewaygrpc.NewClient(conn)
+        resolver := &amp;graphql.Resolver{
+                GetTasksUseCase:          usecases.NewGetTasksUseCase(client),
+                SendTaskToProcessUseCase: usecases.NewSendTaskToProcessUseCase(client),
+        }
+
+        gqlServer := handler.New(graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}))
+        gqlServer.AddTransport(transport.Options{})
+        gqlServer.AddTransport(transport.GET{})
+        gqlServer.AddTransport(transport.POST{})
+        gqlServer.SetQueryCache(lru.New[*ast.QueryDocument](1000))
+        gqlServer.Use(extension.Introspection{})
+        gqlServer.Use(extension.AutomaticPersistedQuery{Cache: lru.New[string](100)})
+
+        home, err := web.NewServer(websocketURL, websocketPort)
+        if err != nil </span><span class="cov0" title="0">{
+                log.Fatal(err)
+        }</span>
+
+        <span class="cov0" title="0">mux := http.NewServeMux()
+        mux.Handle("/", home)
+        mux.Handle("/query", gqlServer)
+        mux.Handle("/health", healthHandler())
+        mux.Handle("/healthz", healthHandler())
+        mux.Handle("/metrics", promhttp.Handler())
+
+        server := &amp;http.Server{
+                Addr:              ":" + port,
+                Handler:           mux,
+                ReadHeaderTimeout: 5 * time.Second,
+                ReadTimeout:       15 * time.Second,
+                WriteTimeout:      30 * time.Second,
+                IdleTimeout:       60 * time.Second,
+                MaxHeaderBytes:    1 &lt;&lt; 20,
+        }
+
+        log.Printf("api gateway listening on :%s", port)
+        log.Fatal(server.ListenAndServe())</span>
+}
+
+func loadDotEnv() <span class="cov0" title="0">{
+        for _, path := range []string{".env", filepath.Join("..", ".env"), filepath.Join("..", "..", ".env")} </span><span class="cov0" title="0">{
+                if err := loadEnvFile(path); err == nil </span><span class="cov0" title="0">{
+                        return
+                }</span>
+        }
+}
+
+func loadEnvFile(path string) error <span class="cov0" title="0">{
+        data, err := os.ReadFile(path)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov0" title="0">for _, line := range strings.Split(string(data), "\n") </span><span class="cov0" title="0">{
+                line = strings.TrimSpace(line)
+                if line == "" || strings.HasPrefix(line, "#") </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">key, value, ok := strings.Cut(line, "=")
+                if !ok </span><span class="cov0" title="0">{
+                        continue</span>
+                }
+                <span class="cov0" title="0">key = strings.TrimSpace(key)
+                value = strings.TrimSpace(value)
+                _ = os.Setenv(key, strings.Trim(value, `"'`))</span>
+        }
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+func getenv(key string, fallback string) string <span class="cov0" title="0">{
+        value := os.Getenv(key)
+        if value == "" </span><span class="cov0" title="0">{
+                return fallback
+        }</span>
+        <span class="cov0" title="0">return value</span>
+}
+
+func healthHandler() http.Handler <span class="cov0" title="0">{
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) </span><span class="cov0" title="0">{
+                w.WriteHeader(http.StatusOK)
+                _, _ = w.Write([]byte("ok"))
+        }</span>)
+}
 </pre>
 		
 		<pre class="file" id="file1" style="display: none">package entities
@@ -128,13 +263,3268 @@ func (t *Task) Validate() error <span class="cov8" title="1">{
 }
 </pre>
 		
-		<pre class="file" id="file2" style="display: none">// Code generated by protoc-gen-go. DO NOT EDIT.
+		<pre class="file" id="file2" style="display: none">// Code generated by github.com/99designs/gqlgen, DO NOT EDIT.
+
+package graphql
+
+import (
+        "bytes"
+        "context"
+        "embed"
+        "errors"
+        "fmt"
+        "strconv"
+        "sync/atomic"
+
+        "github.com/99designs/gqlgen/graphql"
+        "github.com/99designs/gqlgen/graphql/introspection"
+        gqlparser "github.com/vektah/gqlparser/v2"
+        "github.com/vektah/gqlparser/v2/ast"
+)
+
+// region    ************************** generated!.gotpl **************************
+
+// NewExecutableSchema creates an ExecutableSchema from the ResolverRoot interface.
+func NewExecutableSchema(cfg Config) graphql.ExecutableSchema <span class="cov0" title="0">{
+        return &amp;executableSchema{SchemaData: cfg.Schema, Resolvers: cfg.Resolvers, Directives: cfg.Directives, ComplexityRoot: cfg.Complexity}
+}</span>
+
+type Config = graphql.Config[ResolverRoot, DirectiveRoot, ComplexityRoot]
+
+type ResolverRoot interface {
+        Mutation() MutationResolver
+        Query() QueryResolver
+}
+
+type DirectiveRoot struct {
+}
+
+type ComplexityRoot struct {
+        Mutation struct {
+                SendTask func(childComplexity int, messages []string) int
+        }
+
+        Query struct {
+                Tasks func(childComplexity int, limit *int, offset *int) int
+        }
+
+        Task struct {
+                BinaryCode func(childComplexity int) int
+                CreatedAt  func(childComplexity int) int
+                ID         func(childComplexity int) int
+                Message    func(childComplexity int) int
+                UpdatedAt  func(childComplexity int) int
+        }
+}
+
+type MutationResolver interface {
+        SendTask(ctx context.Context, messages []string) ([]*Task, error)
+}
+type QueryResolver interface {
+        Tasks(ctx context.Context, limit *int, offset *int) ([]*Task, error)
+}
+
+type executableSchema graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot]
+
+func (e *executableSchema) Schema() *ast.Schema <span class="cov0" title="0">{
+        if e.SchemaData != nil </span><span class="cov0" title="0">{
+                return e.SchemaData
+        }</span>
+        <span class="cov0" title="0">return parsedSchema</span>
+}
+
+func (e *executableSchema) Complexity(ctx context.Context, typeName, field string, childComplexity int, rawArgs map[string]any) (int, bool) <span class="cov0" title="0">{
+        ec := newExecutionContext(nil, e, nil)
+        _ = ec
+        switch typeName + "." + field </span>{
+
+        case "Mutation.sendTask":<span class="cov0" title="0">
+                if e.ComplexityRoot.Mutation.SendTask == nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov0" title="0">args, err := ec.field_Mutation_sendTask_args(ctx, rawArgs)
+                if err != nil </span><span class="cov0" title="0">{
+                        return 0, false
+                }</span>
+
+                <span class="cov0" title="0">return e.ComplexityRoot.Mutation.SendTask(childComplexity, args["messages"].([]string)), true</span>
+
+        case "Query.tasks":<span class="cov0" title="0">
+                if e.ComplexityRoot.Query.Tasks == nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov0" title="0">args, err := ec.field_Query_tasks_args(ctx, rawArgs)
+                if err != nil </span><span class="cov0" title="0">{
+                        return 0, false
+                }</span>
+
+                <span class="cov0" title="0">return e.ComplexityRoot.Query.Tasks(childComplexity, args["limit"].(*int), args["offset"].(*int)), true</span>
+
+        case "Task.binaryCode":<span class="cov0" title="0">
+                if e.ComplexityRoot.Task.BinaryCode == nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov0" title="0">return e.ComplexityRoot.Task.BinaryCode(childComplexity), true</span>
+        case "Task.createdAt":<span class="cov0" title="0">
+                if e.ComplexityRoot.Task.CreatedAt == nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov0" title="0">return e.ComplexityRoot.Task.CreatedAt(childComplexity), true</span>
+        case "Task.id":<span class="cov0" title="0">
+                if e.ComplexityRoot.Task.ID == nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov0" title="0">return e.ComplexityRoot.Task.ID(childComplexity), true</span>
+        case "Task.message":<span class="cov0" title="0">
+                if e.ComplexityRoot.Task.Message == nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov0" title="0">return e.ComplexityRoot.Task.Message(childComplexity), true</span>
+        case "Task.updatedAt":<span class="cov0" title="0">
+                if e.ComplexityRoot.Task.UpdatedAt == nil </span><span class="cov0" title="0">{
+                        break</span>
+                }
+
+                <span class="cov0" title="0">return e.ComplexityRoot.Task.UpdatedAt(childComplexity), true</span>
+
+        }
+        <span class="cov0" title="0">return 0, false</span>
+}
+
+func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler <span class="cov0" title="0">{
+        opCtx := graphql.GetOperationContext(ctx)
+        ec := newExecutionContext(opCtx, e, make(chan graphql.DeferredResult))
+        inputUnmarshalMap := graphql.BuildUnmarshalerMap()
+        first := true
+
+        switch opCtx.Operation.Operation </span>{
+        case ast.Query:<span class="cov0" title="0">
+                return func(ctx context.Context) *graphql.Response </span><span class="cov0" title="0">{
+                        var response graphql.Response
+                        var data graphql.Marshaler
+                        if first </span><span class="cov0" title="0">{
+                                first = false
+                                ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
+                                data = ec._Query(ctx, opCtx.Operation.SelectionSet)
+                        }</span> else<span class="cov0" title="0"> {
+                                if atomic.LoadInt32(&amp;ec.PendingDeferred) &gt; 0 </span><span class="cov0" title="0">{
+                                        result := &lt;-ec.DeferredResults
+                                        atomic.AddInt32(&amp;ec.PendingDeferred, -1)
+                                        data = result.Result
+                                        response.Path = result.Path
+                                        response.Label = result.Label
+                                        response.Errors = result.Errors
+                                }</span> else<span class="cov0" title="0"> {
+                                        return nil
+                                }</span>
+                        }
+                        <span class="cov0" title="0">var buf bytes.Buffer
+                        data.MarshalGQL(&amp;buf)
+                        response.Data = buf.Bytes()
+                        if atomic.LoadInt32(&amp;ec.Deferred) &gt; 0 </span><span class="cov0" title="0">{
+                                hasNext := atomic.LoadInt32(&amp;ec.PendingDeferred) &gt; 0
+                                response.HasNext = &amp;hasNext
+                        }</span>
+
+                        <span class="cov0" title="0">return &amp;response</span>
+                }
+        case ast.Mutation:<span class="cov0" title="0">
+                return func(ctx context.Context) *graphql.Response </span><span class="cov0" title="0">{
+                        if !first </span><span class="cov0" title="0">{
+                                return nil
+                        }</span>
+                        <span class="cov0" title="0">first = false
+                        ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
+                        data := ec._Mutation(ctx, opCtx.Operation.SelectionSet)
+                        var buf bytes.Buffer
+                        data.MarshalGQL(&amp;buf)
+
+                        return &amp;graphql.Response{
+                                Data: buf.Bytes(),
+                        }</span>
+                }
+
+        default:<span class="cov0" title="0">
+                return graphql.OneShot(graphql.ErrorResponse(ctx, "unsupported GraphQL operation"))</span>
+        }
+}
+
+type executionContext struct {
+        *graphql.ExecutionContextState[ResolverRoot, DirectiveRoot, ComplexityRoot]
+}
+
+func newExecutionContext(
+        opCtx *graphql.OperationContext,
+        execSchema *executableSchema,
+        deferredResults chan graphql.DeferredResult,
+) executionContext <span class="cov0" title="0">{
+        return executionContext{
+                ExecutionContextState: graphql.NewExecutionContextState[ResolverRoot, DirectiveRoot, ComplexityRoot](
+                        opCtx,
+                        (*graphql.ExecutableSchemaState[ResolverRoot, DirectiveRoot, ComplexityRoot])(execSchema),
+                        parsedSchema,
+                        deferredResults,
+                ),
+        }
+}</span>
+
+//go:embed "schema.graphqls"
+var sourcesFS embed.FS
+
+func sourceData(filename string) string <span class="cov0" title="0">{
+        data, err := sourcesFS.ReadFile(filename)
+        if err != nil </span><span class="cov0" title="0">{
+                panic(fmt.Sprintf("codegen problem: %s not available", filename))</span>
+        }
+        <span class="cov0" title="0">return string(data)</span>
+}
+
+var sources = []*ast.Source{
+        {Name: "schema.graphqls", Input: sourceData("schema.graphqls"), BuiltIn: false},
+}
+var parsedSchema = gqlparser.MustLoadSchema(sources...)
+
+// endregion ************************** generated!.gotpl **************************
+
+// region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_sendTask_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) <span class="cov0" title="0">{
+        var err error
+        args := map[string]any{}
+        arg0, err := graphql.ProcessArgField(ctx, rawArgs, "messages", ec.unmarshalNString2ᚕstringᚄ)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">args["messages"] = arg0
+        return args, nil</span>
+}
+
+func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) <span class="cov0" title="0">{
+        var err error
+        args := map[string]any{}
+        arg0, err := graphql.ProcessArgField(ctx, rawArgs, "name", ec.unmarshalNString2string)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">args["name"] = arg0
+        return args, nil</span>
+}
+
+func (ec *executionContext) field_Query_tasks_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) <span class="cov0" title="0">{
+        var err error
+        args := map[string]any{}
+        arg0, err := graphql.ProcessArgField(ctx, rawArgs, "limit", ec.unmarshalOInt2ᚖint)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">args["limit"] = arg0
+        arg1, err := graphql.ProcessArgField(ctx, rawArgs, "offset", ec.unmarshalOInt2ᚖint)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">args["offset"] = arg1
+        return args, nil</span>
+}
+
+func (ec *executionContext) field___Directive_args_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) <span class="cov0" title="0">{
+        var err error
+        args := map[string]any{}
+        arg0, err := graphql.ProcessArgField(ctx, rawArgs, "includeDeprecated", ec.unmarshalOBoolean2ᚖbool)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">args["includeDeprecated"] = arg0
+        return args, nil</span>
+}
+
+func (ec *executionContext) field___Field_args_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) <span class="cov0" title="0">{
+        var err error
+        args := map[string]any{}
+        arg0, err := graphql.ProcessArgField(ctx, rawArgs, "includeDeprecated", ec.unmarshalOBoolean2ᚖbool)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">args["includeDeprecated"] = arg0
+        return args, nil</span>
+}
+
+func (ec *executionContext) field___Type_enumValues_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) <span class="cov0" title="0">{
+        var err error
+        args := map[string]any{}
+        arg0, err := graphql.ProcessArgField(ctx, rawArgs, "includeDeprecated", ec.unmarshalOBoolean2bool)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">args["includeDeprecated"] = arg0
+        return args, nil</span>
+}
+
+func (ec *executionContext) field___Type_fields_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) <span class="cov0" title="0">{
+        var err error
+        args := map[string]any{}
+        arg0, err := graphql.ProcessArgField(ctx, rawArgs, "includeDeprecated", ec.unmarshalOBoolean2bool)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">args["includeDeprecated"] = arg0
+        return args, nil</span>
+}
+
+// endregion ***************************** args.gotpl *****************************
+
+// region    ************************** directives.gotpl **************************
+
+// endregion ************************** directives.gotpl **************************
+
+// region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _Mutation_sendTask(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext_Mutation_sendTask,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        fc := graphql.GetFieldContext(ctx)
+                        return ec.Resolvers.Mutation().SendTask(ctx, fc.Args["messages"].([]string))
+                }</span>,
+                nil,
+                ec.marshalNTask2ᚕᚖgithubᚗcomᚋdouglasvolcatoᚋbinaryᚑcodeᚑprocessorᚋapi_gatewayᚋinternalᚋinfraᚋgraphqlᚐTaskᚄ,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext_Mutation_sendTask(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "Mutation",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: true,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "id":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_id(ctx, field)</span>
+                        case "message":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_message(ctx, field)</span>
+                        case "binaryCode":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_binaryCode(ctx, field)</span>
+                        case "createdAt":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_createdAt(ctx, field)</span>
+                        case "updatedAt":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_updatedAt(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type Task", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        err = ec.Recover(ctx, r)
+                        ec.Error(ctx, err)
+                }</span>
+        }()
+        <span class="cov0" title="0">ctx = graphql.WithFieldContext(ctx, fc)
+        if fc.Args, err = ec.field_Mutation_sendTask_args(ctx, field.ArgumentMap(ec.Variables)); err != nil </span><span class="cov0" title="0">{
+                ec.Error(ctx, err)
+                return fc, err
+        }</span>
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) _Query_tasks(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext_Query_tasks,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        fc := graphql.GetFieldContext(ctx)
+                        return ec.Resolvers.Query().Tasks(ctx, fc.Args["limit"].(*int), fc.Args["offset"].(*int))
+                }</span>,
+                nil,
+                ec.marshalNTask2ᚕᚖgithubᚗcomᚋdouglasvolcatoᚋbinaryᚑcodeᚑprocessorᚋapi_gatewayᚋinternalᚋinfraᚋgraphqlᚐTaskᚄ,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext_Query_tasks(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "Query",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: true,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "id":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_id(ctx, field)</span>
+                        case "message":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_message(ctx, field)</span>
+                        case "binaryCode":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_binaryCode(ctx, field)</span>
+                        case "createdAt":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_createdAt(ctx, field)</span>
+                        case "updatedAt":<span class="cov0" title="0">
+                                return ec.fieldContext_Task_updatedAt(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type Task", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        err = ec.Recover(ctx, r)
+                        ec.Error(ctx, err)
+                }</span>
+        }()
+        <span class="cov0" title="0">ctx = graphql.WithFieldContext(ctx, fc)
+        if fc.Args, err = ec.field_Query_tasks_args(ctx, field.ArgumentMap(ec.Variables)); err != nil </span><span class="cov0" title="0">{
+                ec.Error(ctx, err)
+                return fc, err
+        }</span>
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) _Query___type(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext_Query___type,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        fc := graphql.GetFieldContext(ctx)
+                        return ec.IntrospectType(fc.Args["name"].(string))
+                }</span>,
+                nil,
+                ec.marshalO__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext_Query___type(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "Query",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        err = ec.Recover(ctx, r)
+                        ec.Error(ctx, err)
+                }</span>
+        }()
+        <span class="cov0" title="0">ctx = graphql.WithFieldContext(ctx, fc)
+        if fc.Args, err = ec.field_Query___type_args(ctx, field.ArgumentMap(ec.Variables)); err != nil </span><span class="cov0" title="0">{
+                ec.Error(ctx, err)
+                return fc, err
+        }</span>
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) _Query___schema(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext_Query___schema,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return ec.IntrospectSchema()
+                }</span>,
+                nil,
+                ec.marshalO__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext_Query___schema(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "Query",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Schema_description(ctx, field)</span>
+                        case "types":<span class="cov0" title="0">
+                                return ec.fieldContext___Schema_types(ctx, field)</span>
+                        case "queryType":<span class="cov0" title="0">
+                                return ec.fieldContext___Schema_queryType(ctx, field)</span>
+                        case "mutationType":<span class="cov0" title="0">
+                                return ec.fieldContext___Schema_mutationType(ctx, field)</span>
+                        case "subscriptionType":<span class="cov0" title="0">
+                                return ec.fieldContext___Schema_subscriptionType(ctx, field)</span>
+                        case "directives":<span class="cov0" title="0">
+                                return ec.fieldContext___Schema_directives(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) _Task_id(ctx context.Context, field graphql.CollectedField, obj *Task) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext_Task_id,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.ID, nil
+                }</span>,
+                nil,
+                ec.marshalNString2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext_Task_id(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "Task",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) _Task_message(ctx context.Context, field graphql.CollectedField, obj *Task) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext_Task_message,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Message, nil
+                }</span>,
+                nil,
+                ec.marshalNString2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext_Task_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "Task",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) _Task_binaryCode(ctx context.Context, field graphql.CollectedField, obj *Task) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext_Task_binaryCode,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.BinaryCode, nil
+                }</span>,
+                nil,
+                ec.marshalNString2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext_Task_binaryCode(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "Task",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) _Task_createdAt(ctx context.Context, field graphql.CollectedField, obj *Task) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext_Task_createdAt,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.CreatedAt, nil
+                }</span>,
+                nil,
+                ec.marshalNString2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext_Task_createdAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "Task",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) _Task_updatedAt(ctx context.Context, field graphql.CollectedField, obj *Task) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext_Task_updatedAt,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.UpdatedAt, nil
+                }</span>,
+                nil,
+                ec.marshalNString2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext_Task_updatedAt(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "Task",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Directive_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Directive_name,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Name, nil
+                }</span>,
+                nil,
+                ec.marshalNString2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Directive_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Directive",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Directive_description(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Directive_description,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Description(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Directive_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Directive",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Directive_isRepeatable(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Directive_isRepeatable,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.IsRepeatable, nil
+                }</span>,
+                nil,
+                ec.marshalNBoolean2bool,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Directive_isRepeatable(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Directive",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type Boolean does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Directive_locations(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Directive_locations,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Locations, nil
+                }</span>,
+                nil,
+                ec.marshalN__DirectiveLocation2ᚕstringᚄ,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Directive_locations(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Directive",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type __DirectiveLocation does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Directive_args(ctx context.Context, field graphql.CollectedField, obj *introspection.Directive) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Directive_args,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Args, nil
+                }</span>,
+                nil,
+                ec.marshalN__InputValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValueᚄ,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Directive_args(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Directive",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_description(ctx, field)</span>
+                        case "type":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_type(ctx, field)</span>
+                        case "defaultValue":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_defaultValue(ctx, field)</span>
+                        case "isDeprecated":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_isDeprecated(ctx, field)</span>
+                        case "deprecationReason":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_deprecationReason(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __InputValue", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        err = ec.Recover(ctx, r)
+                        ec.Error(ctx, err)
+                }</span>
+        }()
+        <span class="cov0" title="0">ctx = graphql.WithFieldContext(ctx, fc)
+        if fc.Args, err = ec.field___Directive_args_args(ctx, field.ArgumentMap(ec.Variables)); err != nil </span><span class="cov0" title="0">{
+                ec.Error(ctx, err)
+                return fc, err
+        }</span>
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___EnumValue_name(ctx context.Context, field graphql.CollectedField, obj *introspection.EnumValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___EnumValue_name,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Name, nil
+                }</span>,
+                nil,
+                ec.marshalNString2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___EnumValue_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__EnumValue",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___EnumValue_description(ctx context.Context, field graphql.CollectedField, obj *introspection.EnumValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___EnumValue_description,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Description(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___EnumValue_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__EnumValue",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___EnumValue_isDeprecated(ctx context.Context, field graphql.CollectedField, obj *introspection.EnumValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___EnumValue_isDeprecated,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.IsDeprecated(), nil
+                }</span>,
+                nil,
+                ec.marshalNBoolean2bool,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___EnumValue_isDeprecated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__EnumValue",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type Boolean does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___EnumValue_deprecationReason(ctx context.Context, field graphql.CollectedField, obj *introspection.EnumValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___EnumValue_deprecationReason,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.DeprecationReason(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___EnumValue_deprecationReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__EnumValue",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Field_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Field) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Field_name,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Name, nil
+                }</span>,
+                nil,
+                ec.marshalNString2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Field_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Field",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Field_description(ctx context.Context, field graphql.CollectedField, obj *introspection.Field) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Field_description,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Description(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Field_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Field",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Field_args(ctx context.Context, field graphql.CollectedField, obj *introspection.Field) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Field_args,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Args, nil
+                }</span>,
+                nil,
+                ec.marshalN__InputValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValueᚄ,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Field_args(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Field",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_description(ctx, field)</span>
+                        case "type":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_type(ctx, field)</span>
+                        case "defaultValue":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_defaultValue(ctx, field)</span>
+                        case "isDeprecated":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_isDeprecated(ctx, field)</span>
+                        case "deprecationReason":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_deprecationReason(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __InputValue", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        err = ec.Recover(ctx, r)
+                        ec.Error(ctx, err)
+                }</span>
+        }()
+        <span class="cov0" title="0">ctx = graphql.WithFieldContext(ctx, fc)
+        if fc.Args, err = ec.field___Field_args_args(ctx, field.ArgumentMap(ec.Variables)); err != nil </span><span class="cov0" title="0">{
+                ec.Error(ctx, err)
+                return fc, err
+        }</span>
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Field_type(ctx context.Context, field graphql.CollectedField, obj *introspection.Field) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Field_type,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Type, nil
+                }</span>,
+                nil,
+                ec.marshalN__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Field_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Field",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Field_isDeprecated(ctx context.Context, field graphql.CollectedField, obj *introspection.Field) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Field_isDeprecated,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.IsDeprecated(), nil
+                }</span>,
+                nil,
+                ec.marshalNBoolean2bool,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Field_isDeprecated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Field",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type Boolean does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Field_deprecationReason(ctx context.Context, field graphql.CollectedField, obj *introspection.Field) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Field_deprecationReason,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.DeprecationReason(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Field_deprecationReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Field",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___InputValue_name(ctx context.Context, field graphql.CollectedField, obj *introspection.InputValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___InputValue_name,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Name, nil
+                }</span>,
+                nil,
+                ec.marshalNString2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___InputValue_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__InputValue",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___InputValue_description(ctx context.Context, field graphql.CollectedField, obj *introspection.InputValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___InputValue_description,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Description(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___InputValue_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__InputValue",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___InputValue_type(ctx context.Context, field graphql.CollectedField, obj *introspection.InputValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___InputValue_type,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Type, nil
+                }</span>,
+                nil,
+                ec.marshalN__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___InputValue_type(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__InputValue",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___InputValue_defaultValue(ctx context.Context, field graphql.CollectedField, obj *introspection.InputValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___InputValue_defaultValue,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.DefaultValue, nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___InputValue_defaultValue(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__InputValue",
+                Field:      field,
+                IsMethod:   false,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___InputValue_isDeprecated(ctx context.Context, field graphql.CollectedField, obj *introspection.InputValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___InputValue_isDeprecated,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.IsDeprecated(), nil
+                }</span>,
+                nil,
+                ec.marshalNBoolean2bool,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___InputValue_isDeprecated(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__InputValue",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type Boolean does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___InputValue_deprecationReason(ctx context.Context, field graphql.CollectedField, obj *introspection.InputValue) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___InputValue_deprecationReason,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.DeprecationReason(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___InputValue_deprecationReason(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__InputValue",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Schema_description(ctx context.Context, field graphql.CollectedField, obj *introspection.Schema) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Schema_description,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Description(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Schema_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Schema",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Schema_types(ctx context.Context, field graphql.CollectedField, obj *introspection.Schema) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Schema_types,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Types(), nil
+                }</span>,
+                nil,
+                ec.marshalN__Type2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐTypeᚄ,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Schema_types(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Schema",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Schema_queryType(ctx context.Context, field graphql.CollectedField, obj *introspection.Schema) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Schema_queryType,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.QueryType(), nil
+                }</span>,
+                nil,
+                ec.marshalN__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Schema_queryType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Schema",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Schema_mutationType(ctx context.Context, field graphql.CollectedField, obj *introspection.Schema) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Schema_mutationType,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.MutationType(), nil
+                }</span>,
+                nil,
+                ec.marshalO__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Schema_mutationType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Schema",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Schema_subscriptionType(ctx context.Context, field graphql.CollectedField, obj *introspection.Schema) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Schema_subscriptionType,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.SubscriptionType(), nil
+                }</span>,
+                nil,
+                ec.marshalO__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Schema_subscriptionType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Schema",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Schema_directives(ctx context.Context, field graphql.CollectedField, obj *introspection.Schema) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Schema_directives,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Directives(), nil
+                }</span>,
+                nil,
+                ec.marshalN__Directive2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirectiveᚄ,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Schema_directives(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Schema",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Directive_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Directive_description(ctx, field)</span>
+                        case "isRepeatable":<span class="cov0" title="0">
+                                return ec.fieldContext___Directive_isRepeatable(ctx, field)</span>
+                        case "locations":<span class="cov0" title="0">
+                                return ec.fieldContext___Directive_locations(ctx, field)</span>
+                        case "args":<span class="cov0" title="0">
+                                return ec.fieldContext___Directive_args(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Directive", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_kind(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_kind,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Kind(), nil
+                }</span>,
+                nil,
+                ec.marshalN__TypeKind2string,
+                true,
+                true,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_kind(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type __TypeKind does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_name(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_name,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Name(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_name(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_description(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_description,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Description(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_description(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_specifiedByURL(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_specifiedByURL,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.SpecifiedByURL(), nil
+                }</span>,
+                nil,
+                ec.marshalOString2ᚖstring,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_specifiedByURL(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type String does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_fields(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_fields,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        fc := graphql.GetFieldContext(ctx)
+                        return obj.Fields(fc.Args["includeDeprecated"].(bool)), nil
+                }</span>,
+                nil,
+                ec.marshalO__Field2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐFieldᚄ,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_fields(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Field_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Field_description(ctx, field)</span>
+                        case "args":<span class="cov0" title="0">
+                                return ec.fieldContext___Field_args(ctx, field)</span>
+                        case "type":<span class="cov0" title="0">
+                                return ec.fieldContext___Field_type(ctx, field)</span>
+                        case "isDeprecated":<span class="cov0" title="0">
+                                return ec.fieldContext___Field_isDeprecated(ctx, field)</span>
+                        case "deprecationReason":<span class="cov0" title="0">
+                                return ec.fieldContext___Field_deprecationReason(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Field", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        err = ec.Recover(ctx, r)
+                        ec.Error(ctx, err)
+                }</span>
+        }()
+        <span class="cov0" title="0">ctx = graphql.WithFieldContext(ctx, fc)
+        if fc.Args, err = ec.field___Type_fields_args(ctx, field.ArgumentMap(ec.Variables)); err != nil </span><span class="cov0" title="0">{
+                ec.Error(ctx, err)
+                return fc, err
+        }</span>
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_interfaces(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_interfaces,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.Interfaces(), nil
+                }</span>,
+                nil,
+                ec.marshalO__Type2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐTypeᚄ,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_interfaces(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_possibleTypes(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_possibleTypes,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.PossibleTypes(), nil
+                }</span>,
+                nil,
+                ec.marshalO__Type2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐTypeᚄ,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_possibleTypes(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_enumValues(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_enumValues,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        fc := graphql.GetFieldContext(ctx)
+                        return obj.EnumValues(fc.Args["includeDeprecated"].(bool)), nil
+                }</span>,
+                nil,
+                ec.marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_enumValues(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___EnumValue_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___EnumValue_description(ctx, field)</span>
+                        case "isDeprecated":<span class="cov0" title="0">
+                                return ec.fieldContext___EnumValue_isDeprecated(ctx, field)</span>
+                        case "deprecationReason":<span class="cov0" title="0">
+                                return ec.fieldContext___EnumValue_deprecationReason(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __EnumValue", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">defer func() </span><span class="cov0" title="0">{
+                if r := recover(); r != nil </span><span class="cov0" title="0">{
+                        err = ec.Recover(ctx, r)
+                        ec.Error(ctx, err)
+                }</span>
+        }()
+        <span class="cov0" title="0">ctx = graphql.WithFieldContext(ctx, fc)
+        if fc.Args, err = ec.field___Type_enumValues_args(ctx, field.ArgumentMap(ec.Variables)); err != nil </span><span class="cov0" title="0">{
+                ec.Error(ctx, err)
+                return fc, err
+        }</span>
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_inputFields(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_inputFields,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.InputFields(), nil
+                }</span>,
+                nil,
+                ec.marshalO__InputValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValueᚄ,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_inputFields(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_description(ctx, field)</span>
+                        case "type":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_type(ctx, field)</span>
+                        case "defaultValue":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_defaultValue(ctx, field)</span>
+                        case "isDeprecated":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_isDeprecated(ctx, field)</span>
+                        case "deprecationReason":<span class="cov0" title="0">
+                                return ec.fieldContext___InputValue_deprecationReason(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __InputValue", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_ofType(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_ofType,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.OfType(), nil
+                }</span>,
+                nil,
+                ec.marshalO__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_ofType(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        switch field.Name </span>{
+                        case "kind":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_kind(ctx, field)</span>
+                        case "name":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_name(ctx, field)</span>
+                        case "description":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_description(ctx, field)</span>
+                        case "specifiedByURL":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_specifiedByURL(ctx, field)</span>
+                        case "fields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_fields(ctx, field)</span>
+                        case "interfaces":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_interfaces(ctx, field)</span>
+                        case "possibleTypes":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_possibleTypes(ctx, field)</span>
+                        case "enumValues":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_enumValues(ctx, field)</span>
+                        case "inputFields":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_inputFields(ctx, field)</span>
+                        case "ofType":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_ofType(ctx, field)</span>
+                        case "isOneOf":<span class="cov0" title="0">
+                                return ec.fieldContext___Type_isOneOf(ctx, field)</span>
+                        }
+                        <span class="cov0" title="0">return nil, fmt.Errorf("no field named %q was found under type __Type", field.Name)</span>
+                },
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+func (ec *executionContext) ___Type_isOneOf(ctx context.Context, field graphql.CollectedField, obj *introspection.Type) (ret graphql.Marshaler) <span class="cov0" title="0">{
+        return graphql.ResolveField(
+                ctx,
+                ec.OperationContext,
+                field,
+                ec.fieldContext___Type_isOneOf,
+                func(ctx context.Context) (any, error) </span><span class="cov0" title="0">{
+                        return obj.IsOneOf(), nil
+                }</span>,
+                nil,
+                ec.marshalOBoolean2bool,
+                true,
+                false,
+        )
+}
+
+func (ec *executionContext) fieldContext___Type_isOneOf(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) <span class="cov0" title="0">{
+        fc = &amp;graphql.FieldContext{
+                Object:     "__Type",
+                Field:      field,
+                IsMethod:   true,
+                IsResolver: false,
+                Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) </span><span class="cov0" title="0">{
+                        return nil, errors.New("field of type Boolean does not have child fields")
+                }</span>,
+        }
+        <span class="cov0" title="0">return fc, nil</span>
+}
+
+// endregion **************************** field.gotpl *****************************
+
+// region    **************************** input.gotpl *****************************
+
+// endregion **************************** input.gotpl *****************************
+
+// region    ************************** interface.gotpl ***************************
+
+// endregion ************************** interface.gotpl ***************************
+
+// region    **************************** object.gotpl ****************************
+
+var mutationImplementors = []string{"Mutation"}
+
+func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler <span class="cov0" title="0">{
+        fields := graphql.CollectFields(ec.OperationContext, sel, mutationImplementors)
+        ctx = graphql.WithFieldContext(ctx, &amp;graphql.FieldContext{
+                Object: "Mutation",
+        })
+
+        out := graphql.NewFieldSet(fields)
+        deferred := make(map[string]*graphql.FieldSet)
+        for i, field := range fields </span><span class="cov0" title="0">{
+                innerCtx := graphql.WithRootFieldContext(ctx, &amp;graphql.RootFieldContext{
+                        Object: field.Name,
+                        Field:  field,
+                })
+
+                switch field.Name </span>{
+                case "__typename":<span class="cov0" title="0">
+                        out.Values[i] = graphql.MarshalString("Mutation")</span>
+                case "sendTask":<span class="cov0" title="0">
+                        out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) </span><span class="cov0" title="0">{
+                                return ec._Mutation_sendTask(ctx, field)
+                        }</span>)
+                        <span class="cov0" title="0">if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                default:<span class="cov0" title="0">
+                        panic("unknown field " + strconv.Quote(field.Name))</span>
+                }
+        }
+        <span class="cov0" title="0">out.Dispatch(ctx)
+        if out.Invalids &gt; 0 </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+
+        <span class="cov0" title="0">atomic.AddInt32(&amp;ec.Deferred, int32(len(deferred)))
+
+        for label, dfs := range deferred </span><span class="cov0" title="0">{
+                ec.ProcessDeferredGroup(graphql.DeferredGroup{
+                        Label:    label,
+                        Path:     graphql.GetPath(ctx),
+                        FieldSet: dfs,
+                        Context:  ctx,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return out</span>
+}
+
+var queryImplementors = []string{"Query"}
+
+func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler <span class="cov0" title="0">{
+        fields := graphql.CollectFields(ec.OperationContext, sel, queryImplementors)
+        ctx = graphql.WithFieldContext(ctx, &amp;graphql.FieldContext{
+                Object: "Query",
+        })
+
+        out := graphql.NewFieldSet(fields)
+        deferred := make(map[string]*graphql.FieldSet)
+        for i, field := range fields </span><span class="cov0" title="0">{
+                innerCtx := graphql.WithRootFieldContext(ctx, &amp;graphql.RootFieldContext{
+                        Object: field.Name,
+                        Field:  field,
+                })
+
+                switch field.Name </span>{
+                case "__typename":<span class="cov0" title="0">
+                        out.Values[i] = graphql.MarshalString("Query")</span>
+                case "tasks":<span class="cov0" title="0">
+                        field := field
+
+                        innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) </span><span class="cov0" title="0">{
+                                defer func() </span><span class="cov0" title="0">{
+                                        if r := recover(); r != nil </span><span class="cov0" title="0">{
+                                                ec.Error(ctx, ec.Recover(ctx, r))
+                                        }</span>
+                                }()
+                                <span class="cov0" title="0">res = ec._Query_tasks(ctx, field)
+                                if res == graphql.Null </span><span class="cov0" title="0">{
+                                        atomic.AddUint32(&amp;fs.Invalids, 1)
+                                }</span>
+                                <span class="cov0" title="0">return res</span>
+                        }
+
+                        <span class="cov0" title="0">rrm := func(ctx context.Context) graphql.Marshaler </span><span class="cov0" title="0">{
+                                return ec.OperationContext.RootResolverMiddleware(ctx,
+                                        func(ctx context.Context) graphql.Marshaler </span><span class="cov0" title="0">{ return innerFunc(ctx, out) }</span>)
+                        }
+
+                        <span class="cov0" title="0">out.Concurrently(i, func(ctx context.Context) graphql.Marshaler </span><span class="cov0" title="0">{ return rrm(innerCtx) }</span>)
+                case "__type":<span class="cov0" title="0">
+                        out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) </span><span class="cov0" title="0">{
+                                return ec._Query___type(ctx, field)
+                        }</span>)
+                case "__schema":<span class="cov0" title="0">
+                        out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) </span><span class="cov0" title="0">{
+                                return ec._Query___schema(ctx, field)
+                        }</span>)
+                default:<span class="cov0" title="0">
+                        panic("unknown field " + strconv.Quote(field.Name))</span>
+                }
+        }
+        <span class="cov0" title="0">out.Dispatch(ctx)
+        if out.Invalids &gt; 0 </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+
+        <span class="cov0" title="0">atomic.AddInt32(&amp;ec.Deferred, int32(len(deferred)))
+
+        for label, dfs := range deferred </span><span class="cov0" title="0">{
+                ec.ProcessDeferredGroup(graphql.DeferredGroup{
+                        Label:    label,
+                        Path:     graphql.GetPath(ctx),
+                        FieldSet: dfs,
+                        Context:  ctx,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return out</span>
+}
+
+var taskImplementors = []string{"Task"}
+
+func (ec *executionContext) _Task(ctx context.Context, sel ast.SelectionSet, obj *Task) graphql.Marshaler <span class="cov0" title="0">{
+        fields := graphql.CollectFields(ec.OperationContext, sel, taskImplementors)
+
+        out := graphql.NewFieldSet(fields)
+        deferred := make(map[string]*graphql.FieldSet)
+        for i, field := range fields </span><span class="cov0" title="0">{
+                switch field.Name </span>{
+                case "__typename":<span class="cov0" title="0">
+                        out.Values[i] = graphql.MarshalString("Task")</span>
+                case "id":<span class="cov0" title="0">
+                        out.Values[i] = ec._Task_id(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "message":<span class="cov0" title="0">
+                        out.Values[i] = ec._Task_message(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "binaryCode":<span class="cov0" title="0">
+                        out.Values[i] = ec._Task_binaryCode(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "createdAt":<span class="cov0" title="0">
+                        out.Values[i] = ec._Task_createdAt(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "updatedAt":<span class="cov0" title="0">
+                        out.Values[i] = ec._Task_updatedAt(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                default:<span class="cov0" title="0">
+                        panic("unknown field " + strconv.Quote(field.Name))</span>
+                }
+        }
+        <span class="cov0" title="0">out.Dispatch(ctx)
+        if out.Invalids &gt; 0 </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+
+        <span class="cov0" title="0">atomic.AddInt32(&amp;ec.Deferred, int32(len(deferred)))
+
+        for label, dfs := range deferred </span><span class="cov0" title="0">{
+                ec.ProcessDeferredGroup(graphql.DeferredGroup{
+                        Label:    label,
+                        Path:     graphql.GetPath(ctx),
+                        FieldSet: dfs,
+                        Context:  ctx,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return out</span>
+}
+
+var __DirectiveImplementors = []string{"__Directive"}
+
+func (ec *executionContext) ___Directive(ctx context.Context, sel ast.SelectionSet, obj *introspection.Directive) graphql.Marshaler <span class="cov0" title="0">{
+        fields := graphql.CollectFields(ec.OperationContext, sel, __DirectiveImplementors)
+
+        out := graphql.NewFieldSet(fields)
+        deferred := make(map[string]*graphql.FieldSet)
+        for i, field := range fields </span><span class="cov0" title="0">{
+                switch field.Name </span>{
+                case "__typename":<span class="cov0" title="0">
+                        out.Values[i] = graphql.MarshalString("__Directive")</span>
+                case "name":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Directive_name(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "description":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Directive_description(ctx, field, obj)</span>
+                case "isRepeatable":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Directive_isRepeatable(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "locations":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Directive_locations(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "args":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Directive_args(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                default:<span class="cov0" title="0">
+                        panic("unknown field " + strconv.Quote(field.Name))</span>
+                }
+        }
+        <span class="cov0" title="0">out.Dispatch(ctx)
+        if out.Invalids &gt; 0 </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+
+        <span class="cov0" title="0">atomic.AddInt32(&amp;ec.Deferred, int32(len(deferred)))
+
+        for label, dfs := range deferred </span><span class="cov0" title="0">{
+                ec.ProcessDeferredGroup(graphql.DeferredGroup{
+                        Label:    label,
+                        Path:     graphql.GetPath(ctx),
+                        FieldSet: dfs,
+                        Context:  ctx,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return out</span>
+}
+
+var __EnumValueImplementors = []string{"__EnumValue"}
+
+func (ec *executionContext) ___EnumValue(ctx context.Context, sel ast.SelectionSet, obj *introspection.EnumValue) graphql.Marshaler <span class="cov0" title="0">{
+        fields := graphql.CollectFields(ec.OperationContext, sel, __EnumValueImplementors)
+
+        out := graphql.NewFieldSet(fields)
+        deferred := make(map[string]*graphql.FieldSet)
+        for i, field := range fields </span><span class="cov0" title="0">{
+                switch field.Name </span>{
+                case "__typename":<span class="cov0" title="0">
+                        out.Values[i] = graphql.MarshalString("__EnumValue")</span>
+                case "name":<span class="cov0" title="0">
+                        out.Values[i] = ec.___EnumValue_name(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "description":<span class="cov0" title="0">
+                        out.Values[i] = ec.___EnumValue_description(ctx, field, obj)</span>
+                case "isDeprecated":<span class="cov0" title="0">
+                        out.Values[i] = ec.___EnumValue_isDeprecated(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "deprecationReason":<span class="cov0" title="0">
+                        out.Values[i] = ec.___EnumValue_deprecationReason(ctx, field, obj)</span>
+                default:<span class="cov0" title="0">
+                        panic("unknown field " + strconv.Quote(field.Name))</span>
+                }
+        }
+        <span class="cov0" title="0">out.Dispatch(ctx)
+        if out.Invalids &gt; 0 </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+
+        <span class="cov0" title="0">atomic.AddInt32(&amp;ec.Deferred, int32(len(deferred)))
+
+        for label, dfs := range deferred </span><span class="cov0" title="0">{
+                ec.ProcessDeferredGroup(graphql.DeferredGroup{
+                        Label:    label,
+                        Path:     graphql.GetPath(ctx),
+                        FieldSet: dfs,
+                        Context:  ctx,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return out</span>
+}
+
+var __FieldImplementors = []string{"__Field"}
+
+func (ec *executionContext) ___Field(ctx context.Context, sel ast.SelectionSet, obj *introspection.Field) graphql.Marshaler <span class="cov0" title="0">{
+        fields := graphql.CollectFields(ec.OperationContext, sel, __FieldImplementors)
+
+        out := graphql.NewFieldSet(fields)
+        deferred := make(map[string]*graphql.FieldSet)
+        for i, field := range fields </span><span class="cov0" title="0">{
+                switch field.Name </span>{
+                case "__typename":<span class="cov0" title="0">
+                        out.Values[i] = graphql.MarshalString("__Field")</span>
+                case "name":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Field_name(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "description":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Field_description(ctx, field, obj)</span>
+                case "args":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Field_args(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "type":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Field_type(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "isDeprecated":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Field_isDeprecated(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "deprecationReason":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Field_deprecationReason(ctx, field, obj)</span>
+                default:<span class="cov0" title="0">
+                        panic("unknown field " + strconv.Quote(field.Name))</span>
+                }
+        }
+        <span class="cov0" title="0">out.Dispatch(ctx)
+        if out.Invalids &gt; 0 </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+
+        <span class="cov0" title="0">atomic.AddInt32(&amp;ec.Deferred, int32(len(deferred)))
+
+        for label, dfs := range deferred </span><span class="cov0" title="0">{
+                ec.ProcessDeferredGroup(graphql.DeferredGroup{
+                        Label:    label,
+                        Path:     graphql.GetPath(ctx),
+                        FieldSet: dfs,
+                        Context:  ctx,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return out</span>
+}
+
+var __InputValueImplementors = []string{"__InputValue"}
+
+func (ec *executionContext) ___InputValue(ctx context.Context, sel ast.SelectionSet, obj *introspection.InputValue) graphql.Marshaler <span class="cov0" title="0">{
+        fields := graphql.CollectFields(ec.OperationContext, sel, __InputValueImplementors)
+
+        out := graphql.NewFieldSet(fields)
+        deferred := make(map[string]*graphql.FieldSet)
+        for i, field := range fields </span><span class="cov0" title="0">{
+                switch field.Name </span>{
+                case "__typename":<span class="cov0" title="0">
+                        out.Values[i] = graphql.MarshalString("__InputValue")</span>
+                case "name":<span class="cov0" title="0">
+                        out.Values[i] = ec.___InputValue_name(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "description":<span class="cov0" title="0">
+                        out.Values[i] = ec.___InputValue_description(ctx, field, obj)</span>
+                case "type":<span class="cov0" title="0">
+                        out.Values[i] = ec.___InputValue_type(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "defaultValue":<span class="cov0" title="0">
+                        out.Values[i] = ec.___InputValue_defaultValue(ctx, field, obj)</span>
+                case "isDeprecated":<span class="cov0" title="0">
+                        out.Values[i] = ec.___InputValue_isDeprecated(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "deprecationReason":<span class="cov0" title="0">
+                        out.Values[i] = ec.___InputValue_deprecationReason(ctx, field, obj)</span>
+                default:<span class="cov0" title="0">
+                        panic("unknown field " + strconv.Quote(field.Name))</span>
+                }
+        }
+        <span class="cov0" title="0">out.Dispatch(ctx)
+        if out.Invalids &gt; 0 </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+
+        <span class="cov0" title="0">atomic.AddInt32(&amp;ec.Deferred, int32(len(deferred)))
+
+        for label, dfs := range deferred </span><span class="cov0" title="0">{
+                ec.ProcessDeferredGroup(graphql.DeferredGroup{
+                        Label:    label,
+                        Path:     graphql.GetPath(ctx),
+                        FieldSet: dfs,
+                        Context:  ctx,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return out</span>
+}
+
+var __SchemaImplementors = []string{"__Schema"}
+
+func (ec *executionContext) ___Schema(ctx context.Context, sel ast.SelectionSet, obj *introspection.Schema) graphql.Marshaler <span class="cov0" title="0">{
+        fields := graphql.CollectFields(ec.OperationContext, sel, __SchemaImplementors)
+
+        out := graphql.NewFieldSet(fields)
+        deferred := make(map[string]*graphql.FieldSet)
+        for i, field := range fields </span><span class="cov0" title="0">{
+                switch field.Name </span>{
+                case "__typename":<span class="cov0" title="0">
+                        out.Values[i] = graphql.MarshalString("__Schema")</span>
+                case "description":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Schema_description(ctx, field, obj)</span>
+                case "types":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Schema_types(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "queryType":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Schema_queryType(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "mutationType":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Schema_mutationType(ctx, field, obj)</span>
+                case "subscriptionType":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Schema_subscriptionType(ctx, field, obj)</span>
+                case "directives":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Schema_directives(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                default:<span class="cov0" title="0">
+                        panic("unknown field " + strconv.Quote(field.Name))</span>
+                }
+        }
+        <span class="cov0" title="0">out.Dispatch(ctx)
+        if out.Invalids &gt; 0 </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+
+        <span class="cov0" title="0">atomic.AddInt32(&amp;ec.Deferred, int32(len(deferred)))
+
+        for label, dfs := range deferred </span><span class="cov0" title="0">{
+                ec.ProcessDeferredGroup(graphql.DeferredGroup{
+                        Label:    label,
+                        Path:     graphql.GetPath(ctx),
+                        FieldSet: dfs,
+                        Context:  ctx,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return out</span>
+}
+
+var __TypeImplementors = []string{"__Type"}
+
+func (ec *executionContext) ___Type(ctx context.Context, sel ast.SelectionSet, obj *introspection.Type) graphql.Marshaler <span class="cov0" title="0">{
+        fields := graphql.CollectFields(ec.OperationContext, sel, __TypeImplementors)
+
+        out := graphql.NewFieldSet(fields)
+        deferred := make(map[string]*graphql.FieldSet)
+        for i, field := range fields </span><span class="cov0" title="0">{
+                switch field.Name </span>{
+                case "__typename":<span class="cov0" title="0">
+                        out.Values[i] = graphql.MarshalString("__Type")</span>
+                case "kind":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_kind(ctx, field, obj)
+                        if out.Values[i] == graphql.Null </span><span class="cov0" title="0">{
+                                out.Invalids++
+                        }</span>
+                case "name":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_name(ctx, field, obj)</span>
+                case "description":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_description(ctx, field, obj)</span>
+                case "specifiedByURL":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_specifiedByURL(ctx, field, obj)</span>
+                case "fields":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_fields(ctx, field, obj)</span>
+                case "interfaces":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_interfaces(ctx, field, obj)</span>
+                case "possibleTypes":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_possibleTypes(ctx, field, obj)</span>
+                case "enumValues":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_enumValues(ctx, field, obj)</span>
+                case "inputFields":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_inputFields(ctx, field, obj)</span>
+                case "ofType":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_ofType(ctx, field, obj)</span>
+                case "isOneOf":<span class="cov0" title="0">
+                        out.Values[i] = ec.___Type_isOneOf(ctx, field, obj)</span>
+                default:<span class="cov0" title="0">
+                        panic("unknown field " + strconv.Quote(field.Name))</span>
+                }
+        }
+        <span class="cov0" title="0">out.Dispatch(ctx)
+        if out.Invalids &gt; 0 </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+
+        <span class="cov0" title="0">atomic.AddInt32(&amp;ec.Deferred, int32(len(deferred)))
+
+        for label, dfs := range deferred </span><span class="cov0" title="0">{
+                ec.ProcessDeferredGroup(graphql.DeferredGroup{
+                        Label:    label,
+                        Path:     graphql.GetPath(ctx),
+                        FieldSet: dfs,
+                        Context:  ctx,
+                })
+        }</span>
+
+        <span class="cov0" title="0">return out</span>
+}
+
+// endregion **************************** object.gotpl ****************************
+
+// region    ***************************** type.gotpl *****************************
+
+func (ec *executionContext) unmarshalNBoolean2bool(ctx context.Context, v any) (bool, error) <span class="cov0" title="0">{
+        res, err := graphql.UnmarshalBoolean(v)
+        return res, graphql.ErrorOnPath(ctx, err)
+}</span>
+
+func (ec *executionContext) marshalNBoolean2bool(ctx context.Context, sel ast.SelectionSet, v bool) graphql.Marshaler <span class="cov0" title="0">{
+        _ = sel
+        res := graphql.MarshalBoolean(v)
+        if res == graphql.Null </span><span class="cov0" title="0">{
+                if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) </span><span class="cov0" title="0">{
+                        graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+                }</span>
+        }
+        <span class="cov0" title="0">return res</span>
+}
+
+func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) <span class="cov0" title="0">{
+        res, err := graphql.UnmarshalString(v)
+        return res, graphql.ErrorOnPath(ctx, err)
+}</span>
+
+func (ec *executionContext) marshalNString2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler <span class="cov0" title="0">{
+        _ = sel
+        res := graphql.MarshalString(v)
+        if res == graphql.Null </span><span class="cov0" title="0">{
+                if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) </span><span class="cov0" title="0">{
+                        graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+                }</span>
+        }
+        <span class="cov0" title="0">return res</span>
+}
+
+func (ec *executionContext) unmarshalNString2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) <span class="cov0" title="0">{
+        var vSlice []any
+        vSlice = graphql.CoerceList(v)
+        var err error
+        res := make([]string, len(vSlice))
+        for i := range vSlice </span><span class="cov0" title="0">{
+                ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+                res[i], err = ec.unmarshalNString2string(ctx, vSlice[i])
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+        }
+        <span class="cov0" title="0">return res, nil</span>
+}
+
+func (ec *executionContext) marshalNString2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler <span class="cov0" title="0">{
+        ret := make(graphql.Array, len(v))
+        for i := range v </span><span class="cov0" title="0">{
+                ret[i] = ec.marshalNString2string(ctx, sel, v[i])
+        }</span>
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) marshalNTask2ᚕᚖgithubᚗcomᚋdouglasvolcatoᚋbinaryᚑcodeᚑprocessorᚋapi_gatewayᚋinternalᚋinfraᚋgraphqlᚐTaskᚄ(ctx context.Context, sel ast.SelectionSet, v []*Task) graphql.Marshaler <span class="cov0" title="0">{
+        ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler </span><span class="cov0" title="0">{
+                fc := graphql.GetFieldContext(ctx)
+                fc.Result = &amp;v[i]
+                return ec.marshalNTask2ᚖgithubᚗcomᚋdouglasvolcatoᚋbinaryᚑcodeᚑprocessorᚋapi_gatewayᚋinternalᚋinfraᚋgraphqlᚐTask(ctx, sel, v[i])
+        }</span>)
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) marshalNTask2ᚖgithubᚗcomᚋdouglasvolcatoᚋbinaryᚑcodeᚑprocessorᚋapi_gatewayᚋinternalᚋinfraᚋgraphqlᚐTask(ctx context.Context, sel ast.SelectionSet, v *Task) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) </span><span class="cov0" title="0">{
+                        graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+                }</span>
+                <span class="cov0" title="0">return graphql.Null</span>
+        }
+        <span class="cov0" title="0">return ec._Task(ctx, sel, v)</span>
+}
+
+func (ec *executionContext) marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx context.Context, sel ast.SelectionSet, v introspection.Directive) graphql.Marshaler <span class="cov0" title="0">{
+        return ec.___Directive(ctx, sel, &amp;v)
+}</span>
+
+func (ec *executionContext) marshalN__Directive2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirectiveᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.Directive) graphql.Marshaler <span class="cov0" title="0">{
+        ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler </span><span class="cov0" title="0">{
+                fc := graphql.GetFieldContext(ctx)
+                fc.Result = &amp;v[i]
+                return ec.marshalN__Directive2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐDirective(ctx, sel, v[i])
+        }</span>)
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) unmarshalN__DirectiveLocation2string(ctx context.Context, v any) (string, error) <span class="cov0" title="0">{
+        res, err := graphql.UnmarshalString(v)
+        return res, graphql.ErrorOnPath(ctx, err)
+}</span>
+
+func (ec *executionContext) marshalN__DirectiveLocation2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler <span class="cov0" title="0">{
+        _ = sel
+        res := graphql.MarshalString(v)
+        if res == graphql.Null </span><span class="cov0" title="0">{
+                if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) </span><span class="cov0" title="0">{
+                        graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+                }</span>
+        }
+        <span class="cov0" title="0">return res</span>
+}
+
+func (ec *executionContext) unmarshalN__DirectiveLocation2ᚕstringᚄ(ctx context.Context, v any) ([]string, error) <span class="cov0" title="0">{
+        var vSlice []any
+        vSlice = graphql.CoerceList(v)
+        var err error
+        res := make([]string, len(vSlice))
+        for i := range vSlice </span><span class="cov0" title="0">{
+                ctx := graphql.WithPathContext(ctx, graphql.NewPathWithIndex(i))
+                res[i], err = ec.unmarshalN__DirectiveLocation2string(ctx, vSlice[i])
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+        }
+        <span class="cov0" title="0">return res, nil</span>
+}
+
+func (ec *executionContext) marshalN__DirectiveLocation2ᚕstringᚄ(ctx context.Context, sel ast.SelectionSet, v []string) graphql.Marshaler <span class="cov0" title="0">{
+        ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler </span><span class="cov0" title="0">{
+                fc := graphql.GetFieldContext(ctx)
+                fc.Result = &amp;v[i]
+                return ec.marshalN__DirectiveLocation2string(ctx, sel, v[i])
+        }</span>)
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) marshalN__EnumValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValue(ctx context.Context, sel ast.SelectionSet, v introspection.EnumValue) graphql.Marshaler <span class="cov0" title="0">{
+        return ec.___EnumValue(ctx, sel, &amp;v)
+}</span>
+
+func (ec *executionContext) marshalN__Field2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐField(ctx context.Context, sel ast.SelectionSet, v introspection.Field) graphql.Marshaler <span class="cov0" title="0">{
+        return ec.___Field(ctx, sel, &amp;v)
+}</span>
+
+func (ec *executionContext) marshalN__InputValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValue(ctx context.Context, sel ast.SelectionSet, v introspection.InputValue) graphql.Marshaler <span class="cov0" title="0">{
+        return ec.___InputValue(ctx, sel, &amp;v)
+}</span>
+
+func (ec *executionContext) marshalN__InputValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.InputValue) graphql.Marshaler <span class="cov0" title="0">{
+        ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler </span><span class="cov0" title="0">{
+                fc := graphql.GetFieldContext(ctx)
+                fc.Result = &amp;v[i]
+                return ec.marshalN__InputValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValue(ctx, sel, v[i])
+        }</span>)
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) marshalN__Type2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx context.Context, sel ast.SelectionSet, v introspection.Type) graphql.Marshaler <span class="cov0" title="0">{
+        return ec.___Type(ctx, sel, &amp;v)
+}</span>
+
+func (ec *executionContext) marshalN__Type2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.Type) graphql.Marshaler <span class="cov0" title="0">{
+        ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler </span><span class="cov0" title="0">{
+                fc := graphql.GetFieldContext(ctx)
+                fc.Result = &amp;v[i]
+                return ec.marshalN__Type2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx, sel, v[i])
+        }</span>)
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) marshalN__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx context.Context, sel ast.SelectionSet, v *introspection.Type) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) </span><span class="cov0" title="0">{
+                        graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+                }</span>
+                <span class="cov0" title="0">return graphql.Null</span>
+        }
+        <span class="cov0" title="0">return ec.___Type(ctx, sel, v)</span>
+}
+
+func (ec *executionContext) unmarshalN__TypeKind2string(ctx context.Context, v any) (string, error) <span class="cov0" title="0">{
+        res, err := graphql.UnmarshalString(v)
+        return res, graphql.ErrorOnPath(ctx, err)
+}</span>
+
+func (ec *executionContext) marshalN__TypeKind2string(ctx context.Context, sel ast.SelectionSet, v string) graphql.Marshaler <span class="cov0" title="0">{
+        _ = sel
+        res := graphql.MarshalString(v)
+        if res == graphql.Null </span><span class="cov0" title="0">{
+                if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) </span><span class="cov0" title="0">{
+                        graphql.AddErrorf(ctx, "the requested element is null which the schema does not allow")
+                }</span>
+        }
+        <span class="cov0" title="0">return res</span>
+}
+
+func (ec *executionContext) unmarshalOBoolean2bool(ctx context.Context, v any) (bool, error) <span class="cov0" title="0">{
+        res, err := graphql.UnmarshalBoolean(v)
+        return res, graphql.ErrorOnPath(ctx, err)
+}</span>
+
+func (ec *executionContext) marshalOBoolean2bool(ctx context.Context, sel ast.SelectionSet, v bool) graphql.Marshaler <span class="cov0" title="0">{
+        _ = sel
+        _ = ctx
+        res := graphql.MarshalBoolean(v)
+        return res
+}</span>
+
+func (ec *executionContext) unmarshalOBoolean2ᚖbool(ctx context.Context, v any) (*bool, error) <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return nil, nil
+        }</span>
+        <span class="cov0" title="0">res, err := graphql.UnmarshalBoolean(v)
+        return &amp;res, graphql.ErrorOnPath(ctx, err)</span>
+}
+
+func (ec *executionContext) marshalOBoolean2ᚖbool(ctx context.Context, sel ast.SelectionSet, v *bool) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+        <span class="cov0" title="0">_ = sel
+        _ = ctx
+        res := graphql.MarshalBoolean(*v)
+        return res</span>
+}
+
+func (ec *executionContext) unmarshalOInt2ᚖint(ctx context.Context, v any) (*int, error) <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return nil, nil
+        }</span>
+        <span class="cov0" title="0">res, err := graphql.UnmarshalInt(v)
+        return &amp;res, graphql.ErrorOnPath(ctx, err)</span>
+}
+
+func (ec *executionContext) marshalOInt2ᚖint(ctx context.Context, sel ast.SelectionSet, v *int) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+        <span class="cov0" title="0">_ = sel
+        _ = ctx
+        res := graphql.MarshalInt(*v)
+        return res</span>
+}
+
+func (ec *executionContext) unmarshalOString2ᚖstring(ctx context.Context, v any) (*string, error) <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return nil, nil
+        }</span>
+        <span class="cov0" title="0">res, err := graphql.UnmarshalString(v)
+        return &amp;res, graphql.ErrorOnPath(ctx, err)</span>
+}
+
+func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel ast.SelectionSet, v *string) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+        <span class="cov0" title="0">_ = sel
+        _ = ctx
+        res := graphql.MarshalString(*v)
+        return res</span>
+}
+
+func (ec *executionContext) marshalO__EnumValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.EnumValue) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+        <span class="cov0" title="0">ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler </span><span class="cov0" title="0">{
+                fc := graphql.GetFieldContext(ctx)
+                fc.Result = &amp;v[i]
+                return ec.marshalN__EnumValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐEnumValue(ctx, sel, v[i])
+        }</span>)
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) marshalO__Field2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐFieldᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.Field) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+        <span class="cov0" title="0">ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler </span><span class="cov0" title="0">{
+                fc := graphql.GetFieldContext(ctx)
+                fc.Result = &amp;v[i]
+                return ec.marshalN__Field2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐField(ctx, sel, v[i])
+        }</span>)
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) marshalO__InputValue2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValueᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.InputValue) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+        <span class="cov0" title="0">ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler </span><span class="cov0" title="0">{
+                fc := graphql.GetFieldContext(ctx)
+                fc.Result = &amp;v[i]
+                return ec.marshalN__InputValue2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐInputValue(ctx, sel, v[i])
+        }</span>)
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) marshalO__Schema2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐSchema(ctx context.Context, sel ast.SelectionSet, v *introspection.Schema) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+        <span class="cov0" title="0">return ec.___Schema(ctx, sel, v)</span>
+}
+
+func (ec *executionContext) marshalO__Type2ᚕgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐTypeᚄ(ctx context.Context, sel ast.SelectionSet, v []introspection.Type) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+        <span class="cov0" title="0">ret := graphql.MarshalSliceConcurrently(ctx, len(v), 0, false, func(ctx context.Context, i int) graphql.Marshaler </span><span class="cov0" title="0">{
+                fc := graphql.GetFieldContext(ctx)
+                fc.Result = &amp;v[i]
+                return ec.marshalN__Type2githubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx, sel, v[i])
+        }</span>)
+
+        <span class="cov0" title="0">for _, e := range ret </span><span class="cov0" title="0">{
+                if e == graphql.Null </span><span class="cov0" title="0">{
+                        return graphql.Null
+                }</span>
+        }
+
+        <span class="cov0" title="0">return ret</span>
+}
+
+func (ec *executionContext) marshalO__Type2ᚖgithubᚗcomᚋ99designsᚋgqlgenᚋgraphqlᚋintrospectionᚐType(ctx context.Context, sel ast.SelectionSet, v *introspection.Type) graphql.Marshaler <span class="cov0" title="0">{
+        if v == nil </span><span class="cov0" title="0">{
+                return graphql.Null
+        }</span>
+        <span class="cov0" title="0">return ec.___Type(ctx, sel, v)</span>
+}
+
+// endregion ***************************** type.gotpl *****************************
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">package graphql
+
+// This file will be automatically regenerated based on the schema, any resolver
+// implementations
+// will be copied through when generating and any unknown code will be moved to the end.
+// Code generated by github.com/99designs/gqlgen version v0.17.89
+
+import (
+        "context"
+        "fmt"
+        "strings"
+
+        "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+        "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases"
+)
+
+// SendTask is the resolver for the sendTask field.
+func (r *mutationResolver) SendTask(ctx context.Context, messages []string) ([]*Task, error) <span class="cov0" title="0">{
+        _ = ctx
+        cleanedMessages := make([]string, 0, len(messages))
+        for _, message := range messages </span><span class="cov0" title="0">{
+                if strings.TrimSpace(message) == "" </span><span class="cov0" title="0">{
+                        return nil, fmt.Errorf("messages cannot contain empty values")
+                }</span>
+                <span class="cov0" title="0">cleanedMessages = append(cleanedMessages, strings.TrimSpace(message))</span>
+        }
+        <span class="cov0" title="0">if len(cleanedMessages) == 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("messages cannot be empty")
+        }</span>
+
+        <span class="cov0" title="0">output, err := r.SendTaskToProcessUseCase.Execute(&amp;usecases.SendTaskToProcessInput{
+                Ctx:      ctx,
+                Messages: cleanedMessages,
+        })
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return mapTasks(output.Tasks), nil</span>
+}
+
+// Tasks is the resolver for the tasks field.
+func (r *queryResolver) Tasks(ctx context.Context, limit *int, offset *int) ([]*Task, error) <span class="cov0" title="0">{
+        _ = ctx
+        limitValue := 100
+        offsetValue := 0
+        if limit != nil </span><span class="cov0" title="0">{
+                limitValue = *limit
+        }</span>
+        <span class="cov0" title="0">if offset != nil </span><span class="cov0" title="0">{
+                offsetValue = *offset
+        }</span>
+        <span class="cov0" title="0">if limitValue &lt;= 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("limit must be greater than zero")
+        }</span>
+        <span class="cov0" title="0">if offsetValue &lt; 0 </span><span class="cov0" title="0">{
+                return nil, fmt.Errorf("offset cannot be negative")
+        }</span>
+
+        <span class="cov0" title="0">output, err := r.GetTasksUseCase.Execute(&amp;usecases.GetTasksInput{
+                Ctx:    ctx,
+                Limit:  limitValue,
+                Offset: offsetValue,
+        })
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return mapTasks(output.Tasks), nil</span>
+}
+
+// Mutation returns MutationResolver implementation.
+func (r *Resolver) Mutation() MutationResolver <span class="cov0" title="0">{ return &amp;mutationResolver{r} }</span>
+
+// Query returns QueryResolver implementation.
+func (r *Resolver) Query() QueryResolver <span class="cov0" title="0">{ return &amp;queryResolver{r} }</span>
+
+type mutationResolver struct{ *Resolver }
+type queryResolver struct{ *Resolver }
+
+func mapTasks(tasks []entities.Task) []*Task <span class="cov0" title="0">{
+        mapped := make([]*Task, 0, len(tasks))
+        for _, task := range tasks </span><span class="cov0" title="0">{
+                mapped = append(mapped, mapTask(task))
+        }</span>
+        <span class="cov0" title="0">return mapped</span>
+}
+
+func mapTask(task entities.Task) *Task <span class="cov0" title="0">{
+        return &amp;Task{
+                ID:         task.ID,
+                Message:    task.Message,
+                BinaryCode: task.BinaryCode,
+                CreatedAt:  task.CreatedAt,
+                UpdatedAt:  task.UpdatedAt,
+        }
+}</span>
+</pre>
+		
+		<pre class="file" id="file4" style="display: none">package grpc
+
+import (
+        "context"
+        "encoding/json"
+
+        "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+        "google.golang.org/grpc"
+        "google.golang.org/grpc/encoding"
+)
+
+type jsonCodec struct{}
+
+func (jsonCodec) Marshal(v interface{}) ([]byte, error) <span class="cov0" title="0">{
+        return json.Marshal(v)
+}</span>
+
+func (jsonCodec) Unmarshal(data []byte, v interface{}) error <span class="cov0" title="0">{
+        return json.Unmarshal(data, v)
+}</span>
+
+func (jsonCodec) Name() string <span class="cov0" title="0">{
+        return "json"
+}</span>
+
+func init() <span class="cov0" title="0">{
+        encoding.RegisterCodec(jsonCodec{})
+}</span>
+
+type TaskRecord struct {
+        ID         string `json:"id"`
+        Message    string `json:"message"`
+        BinaryCode string `json:"binaryCode"`
+        CreatedAt  string `json:"createdAt"`
+        UpdatedAt  string `json:"updatedAt"`
+}
+
+type ReceiveTaskRequest struct {
+        Message string `json:"message"`
+}
+
+type ReceiveTaskResponse struct {
+        Tasks []TaskRecord `json:"tasks"`
+}
+
+type TaskListRequest struct {
+        Limit  int `json:"limit"`
+        Offset int `json:"offset"`
+}
+
+type TaskListResponse struct {
+        Tasks []TaskRecord `json:"tasks"`
+}
+
+type Client struct {
+        conn *grpc.ClientConn
+}
+
+func NewClient(conn *grpc.ClientConn) *Client <span class="cov0" title="0">{
+        return &amp;Client{conn: conn}
+}</span>
+
+func (c *Client) GetTasks(ctx context.Context, limit int, offset int) ([]entities.Task, error) <span class="cov0" title="0">{
+        out := new(TaskListResponse)
+        if err := c.conn.Invoke(
+                ctx,
+                "/task.TaskService/GetTasks",
+                &amp;TaskListRequest{Limit: limit, Offset: offset},
+                out,
+                grpc.ForceCodec(jsonCodec{}),
+        ); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return mapTasks(out.Tasks), nil</span>
+}
+
+func (c *Client) SendTaskToProcess(ctx context.Context, messages []string) ([]entities.Task, error) <span class="cov0" title="0">{
+        stream, err := c.conn.NewStream(
+                ctx,
+                &amp;grpc.StreamDesc{StreamName: "ReceiveTaskToProcess", ClientStreams: true},
+                "/task.TaskService/ReceiveTaskToProcess",
+                grpc.ForceCodec(jsonCodec{}),
+        )
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">for _, message := range messages </span><span class="cov0" title="0">{
+                if err := stream.SendMsg(&amp;ReceiveTaskRequest{Message: message}); err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+        }
+
+        <span class="cov0" title="0">if err := stream.CloseSend(); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">out := new(ReceiveTaskResponse)
+        if err := stream.RecvMsg(out); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov0" title="0">return mapTasks(out.Tasks), nil</span>
+}
+
+func mapTasks(tasks []TaskRecord) []entities.Task <span class="cov0" title="0">{
+        mapped := make([]entities.Task, 0, len(tasks))
+        for _, task := range tasks </span><span class="cov0" title="0">{
+                mapped = append(mapped, entities.Task{
+                        ID:         task.ID,
+                        Message:    task.Message,
+                        BinaryCode: task.BinaryCode,
+                        CreatedAt:  task.CreatedAt,
+                        UpdatedAt:  task.UpdatedAt,
+                })
+        }</span>
+        <span class="cov0" title="0">return mapped</span>
+}
+</pre>
+		
+		<pre class="file" id="file5" style="display: none">// Code generated by protoc-gen-go. DO NOT EDIT.
 // versions:
 //         protoc-gen-go v1.36.11
 //         protoc        v3.12.4
 // source: task.proto
 
-package task
+package grpc
 
 import (
         protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -352,7 +3742,7 @@ const file_task_proto_rawDesc = "" +
         "\x05tasks\x18\x01 \x03(\tR\x05tasks2\xad\x01\n" +
         "\vTaskService\x12a\n" +
         "\x14ReceiveTaskToProcess\x12!.task.ReceiveTaskToProcessRequest\x1a\".task.ReceiveTaskToProcessResponse\"\x00(\x01\x12;\n" +
-        "\bGetTasks\x12\x15.task.GetTasksRequest\x1a\x16.task.GetTasksResponse\"\x00BRZPgithub.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task;taskb\x06proto3"
+        "\bGetTasks\x12\x15.task.GetTasksRequest\x1a\x16.task.GetTasksResponse\"\x00B[ZYgithub.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc/task;taskb\x06proto3"
 
 var (
         file_task_proto_rawDescOnce sync.Once
@@ -410,13 +3800,13 @@ func file_task_proto_init() <span class="cov0" title="0">{
 }
 </pre>
 		
-		<pre class="file" id="file3" style="display: none">// Code generated by protoc-gen-go-grpc. DO NOT EDIT.
+		<pre class="file" id="file6" style="display: none">// Code generated by protoc-gen-go-grpc. DO NOT EDIT.
 // versions:
 // - protoc-gen-go-grpc v1.6.1
 // - protoc             v3.12.4
 // source: task.proto
 
-package task
+package grpc
 
 import (
         context "context"
@@ -565,9 +3955,56 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 }
 </pre>
 		
-		<pre class="file" id="file4" style="display: none">package usecases
+		<pre class="file" id="file7" style="display: none">package web
 
-import "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+import (
+        "embed"
+        "html/template"
+        "net/http"
+)
+
+//go:embed index.html
+var content embed.FS
+
+type Server struct {
+        tmpl             *template.Template
+        websocketURL     string
+        websocketPort    string
+}
+
+type pageData struct {
+        WebSocketURL  string
+        WebSocketPort string
+}
+
+func NewServer(websocketURL string, websocketPort string) (*Server, error) <span class="cov0" title="0">{
+        tmpl, err := template.ParseFS(content, "index.html")
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return &amp;Server{
+                tmpl:          tmpl,
+                websocketURL:  websocketURL,
+                websocketPort: websocketPort,
+        }, nil</span>
+}
+
+func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) <span class="cov0" title="0">{
+        w.Header().Set("Content-Type", "text/html; charset=utf-8")
+        if err := s.tmpl.Execute(w, pageData{WebSocketURL: s.websocketURL, WebSocketPort: s.websocketPort}); err != nil </span><span class="cov0" title="0">{
+                http.Error(w, err.Error(), http.StatusInternalServerError)
+        }</span>
+}
+</pre>
+		
+		<pre class="file" id="file8" style="display: none">package usecases
+
+import (
+        "context"
+
+        "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+)
 
 type GetTasksUseCase struct {
         Repo TaskRepositoryInterface
@@ -580,6 +4017,7 @@ func NewGetTasksUseCase(repo TaskRepositoryInterface) *GetTasksUseCase <span cla
 }</span>
 
 type GetTasksInput struct {
+        Ctx    context.Context
         Limit  int
         Offset int
 }
@@ -592,7 +4030,11 @@ func (u *GetTasksUseCase) Execute(input *GetTasksInput) (*GetTasksOutput, error)
         if input.Limit &lt;= 0 || input.Limit &gt; 20 </span><span class="cov8" title="1">{
                 input.Limit = 20
         }</span>
-        <span class="cov8" title="1">tasks, err := u.Repo.GetTasks(input.Limit, input.Offset)
+        <span class="cov8" title="1">ctx := input.Ctx
+        if ctx == nil </span><span class="cov0" title="0">{
+                ctx = context.Background()
+        }</span>
+        <span class="cov8" title="1">tasks, err := u.Repo.GetTasks(ctx, input.Limit, input.Offset)
         if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
@@ -602,9 +4044,13 @@ func (u *GetTasksUseCase) Execute(input *GetTasksInput) (*GetTasksOutput, error)
 }
 </pre>
 		
-		<pre class="file" id="file5" style="display: none">package usecases
+		<pre class="file" id="file9" style="display: none">package usecases
 
-import "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+import (
+        "context"
+
+        "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/entities"
+)
 
 type SendTaskToProcessUseCase struct {
         Repo TaskProcessorInterface
@@ -617,6 +4063,7 @@ func NewSendTaskToProcessUseCase(repo TaskProcessorInterface) *SendTaskToProcess
 }</span>
 
 type SendTaskToProcessInput struct {
+        Ctx      context.Context
         Messages []string
 }
 
@@ -626,7 +4073,11 @@ type SendTaskToProcessOutput struct {
 }
 
 func (u *SendTaskToProcessUseCase) Execute(input *SendTaskToProcessInput) (*SendTaskToProcessOutput, error) <span class="cov8" title="1">{
-        tasks, err := u.Repo.SendTaskToProcess(input.Messages)
+        ctx := input.Ctx
+        if ctx == nil </span><span class="cov0" title="0">{
+                ctx = context.Background()
+        }</span>
+        <span class="cov8" title="1">tasks, err := u.Repo.SendTaskToProcess(ctx, input.Messages)
         if err != nil </span><span class="cov8" title="1">{
                 return nil, err
         }</span>
@@ -637,7 +4088,7 @@ func (u *SendTaskToProcessUseCase) Execute(input *SendTaskToProcessInput) (*Send
 }
 </pre>
 		
-		<pre class="file" id="file6" style="display: none">package test
+		<pre class="file" id="file10" style="display: none">package test
 
 import (
         "github.com/go-faker/faker/v4"
