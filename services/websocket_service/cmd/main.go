@@ -13,6 +13,7 @@ import (
 	"github.com/douglasvolcato/binary-code-processor/websocket_service/internal/infra/queue"
 	ws "github.com/douglasvolcato/binary-code-processor/websocket_service/internal/infra/websocket"
 	"github.com/douglasvolcato/binary-code-processor/websocket_service/internal/usecases"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const defaultRabbitURL = "amqp://guest:guest@localhost:5672/"
@@ -49,10 +50,9 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/ws", hub)
-	mux.Handle("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	}))
+	mux.Handle("/health", healthHandler())
+	mux.Handle("/healthz", healthHandler())
+	mux.Handle("/metrics", promhttp.Handler())
 
 	server := &http.Server{
 		Addr:              ":" + port,
@@ -135,4 +135,11 @@ func getenv(key string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func healthHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 }

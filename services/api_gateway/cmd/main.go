@@ -17,6 +17,7 @@ import (
 	gatewaygrpc "github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/grpc"
 	"github.com/douglasvolcato/binary-code-processor/api_gateway/internal/infra/web"
 	"github.com/douglasvolcato/binary-code-processor/api_gateway/internal/usecases"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/vektah/gqlparser/v2/ast"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -64,10 +65,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/", home)
 	mux.Handle("/query", gqlServer)
-	mux.Handle("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte("ok"))
-	}))
+	mux.Handle("/health", healthHandler())
+	mux.Handle("/healthz", healthHandler())
+	mux.Handle("/metrics", promhttp.Handler())
 
 	server := &http.Server{
 		Addr:              ":" + port,
@@ -120,4 +120,11 @@ func getenv(key string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func healthHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 }
