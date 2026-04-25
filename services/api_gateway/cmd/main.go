@@ -24,7 +24,7 @@ import (
 )
 
 const defaultPort = "8080"
-const defaultTaskServiceAddr = "localhost:50051"
+const defaultTaskServiceAddr = "127.0.0.1:50051"
 
 func main() {
 	loadDotEnv()
