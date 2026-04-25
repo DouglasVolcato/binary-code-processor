@@ -2,403 +2,116 @@
 
 Distributed system that processes messages and turns them into binary code. It was made using Golang, TDD, Clean Architecture and following scalability principles.
 
-## Technologies:
-- Golang: Code language
-- WebSocket: Used to get real time statuses
-- RabbitMQ: Used to queue processes
-- GraphQL: Used to simplify the api interaction
-- gRPC: Used to simplify the microservices interaction
-- Postgres: Database
-- Kubernetes: Used to manage the containers and scale services
+## Technologies
+- Golang
+- WebSocket (real-time updates)
+- RabbitMQ (async queueing)
+- GraphQL (API Gateway)
+- gRPC (service-to-service)
+- Postgres (persistent storage)
+- Kubernetes (orchestration)
 
-## Architecture:
-<img src="docs/diagram.png">
+## Architecture
+Below is the main architecture diagram showing the services and the message flow.
 
-### 1 - Client
-- Fetches tasks from the API Gateway through GraphQL
-- Sends task messages through GraphQL mutations
-- Connects to the WebSocket Service for realtime updates
+![Architecture diagram](docs/diagram.png)
 
-### 2 - API Gateway
-- Receives GraphQL queries and mutations from the client
-- Validates pagination and message payloads
-- Lists tasks with `limit` and `offset`
-- Sends `messages[]` to the Task Service
-- Does not persist domain data
-- Does not handle WebSocket connections
+## Screenshots (gallery)
+This repository includes a few screenshots captured from the demo environment to help visualise the system:
 
-### 3 - Task Service
-- Owns the Postgres database as the source of truth
-- Creates tasks from incoming messages by inserting rows into Postgres
-- Returns tasks by ID and paginated lists by reading Postgres
-- Marks tasks as processed by updating the task row in Postgres when the Processing Service finishes
-- Writes outbox events to Postgres for the Event Publisher
-- Receives only the task `ID` for the processed-task flow
+- **Client UI** — `docs/ui.png`
+  ![UI Screenshot](docs/ui.png)
+  _The client web UI used to submit messages, inspect recent tasks and see live WebSocket events._
 
-### 4 - Processing Service
-- Receives only the task `ID`
-- Reads the task data through the Task Service repository boundary
-- Converts `message` into `binaryCode`
-- Returns `ID + BinaryCode`
-- Sends the processed result back through gRPC so the task can be marked as processed
+- **Observability (Grafana)** — `docs/grafana.png`
+  ![Grafana dashboard](docs/grafana.png)
+  _Grafana dashboard showing service metrics (CPU, goroutines, request rates, etc.). Useful to verify deployment health._
 
-### 5 - Event Publisher
-- Reads events by status from the outbox table in Postgres
-- Reads unprocessed events and sends them to the queue flow in RabbitMQ
-- Reads processed events and sends them to the fanout flow in RabbitMQ
-- Keeps the queue and fanout reads separated
-- Bridges event states to RabbitMQ and downstream consumers
+- **Kubernetes / cluster view** — `docs/k8s.png`
+  ![Kubernetes overview](docs/k8s.png)
+  _A screenshot with `kubectl` output showing running pods and services used in the demo._
 
-### 6 - WebSocket Service
-- Receives only `Task{ID, BinaryCode}`
-- Sends realtime updates to connected clients
-- Does not depend on message text, timestamps, or other task fields
+- **Test coverage snapshot** — `docs/test-coverage.png`
+  ![Test coverage screenshot](docs/test-coverage.png)
+  _Coverage report snapshot used during development and CI checks._
 
-## Transport Map
 
-This project uses different transports for different parts of the flow:
+## End-to-end Flow (summary)
 
-- GraphQL: client to API Gateway
-- gRPC: API Gateway to Task Service, and Task Service to the processed-task callback path
-- Postgres: Task Service stores and reads tasks and outbox events, and Event Publisher polls the outbox
-- RabbitMQ: Event Publisher publishes async events to consumers
-- WebSocket: WebSocket Service to the client
+The project implements a small distributed pipeline. High level flow:
 
-The use cases below are the business layer. The transport layer wraps them.
+1. Client sends `messages[]` to the API Gateway using GraphQL.
+2. API Gateway streams messages to the Task Service (gRPC).
+3. Task Service inserts tasks into Postgres and writes an unprocessed outbox event.
+4. Event Publisher polls unprocessed events and publishes them to RabbitMQ (queue flow).
+5. A processing worker consumes the queue, reads the task payload, converts the message to binary and streams the processed result back to the Task Service (gRPC callback).
+6. Task Service marks the task as processed and writes a processed outbox event.
+7. Event Publisher publishes processed events to a fanout exchange which the WebSocket Service consumes.
+8. WebSocket Service pushes `Task{ID, BinaryCode}` to connected clients.
 
-## End-to-end Flow Example
+See the detailed section below for contracts and use cases.
 
-This is the exact path a batch of client messages follows until the result reaches the client again through WebSocket.
-
-### Contract shapes used in the flow
+## Contract shapes used in the flow
 
 - `api_gateway/internal/entities.Task`: `ID`, `Message`, `BinaryCode`, `CreatedAt`, `UpdatedAt`
 - `task_service/internal/entities.Task`: `ID`, `Message`, `BinaryCode`, `CreatedAt`, `UpdatedAt`
 - `processing_service/internal/entities.Task`: `ID`, `BinaryCode`
 - `websocket_service/internal/entities.Task`: `ID`, `BinaryCode`
 
-### Data format notes
+## Data format notes
 
-- Task IDs are opaque string identifiers generated by `IDGenerator`; the tests use UUID-like values.
-- `CreatedAt` and `UpdatedAt` are represented as strings at the service boundary in the current codebase.
-- If these values are persisted in Postgres, the repository adapter should map them to `timestamp` or `timestamptz` columns.
-- `BinaryCode` is empty before processing and is only populated after the `ProcessTaskUseCase` step.
-- The current code exposes the `GetTaskByID` read as a repository boundary; the matching gRPC adapter is not present in the proto files yet.
+- Task IDs are opaque string identifiers generated by `IDGenerator`.
+- `CreatedAt` and `UpdatedAt` are represented as strings at service boundaries in the codebase.
+- If persisted in Postgres, timestamp fields should be mapped to `timestamp`/`timestamptz`.
+- `BinaryCode` is empty before processing and set after `ProcessTaskUseCase` runs.
 
-### Example input from the client
+## Transport Map
 
-```text
-messages = ["hello", "world"]
-```
+- GraphQL: client ⇢ API Gateway
+- gRPC: API Gateway ⇢ Task Service; Processing Service ⇢ Task Service (callback)
+- Postgres: Task Service storage + outbox table
+- RabbitMQ: Event Publisher → queue & fanout flows
+- WebSocket: WebSocket Service → client
+
+## End-to-end Flow Example
+
+This is the detailed chain of usecases and transports the system implements.
 
 ### 1 - API Gateway
-
-Use case:
-`SendTaskToProcessUseCase`
-
-Input type:
-`SendTaskToProcessInput`
+Use case: `SendTaskToProcessUseCase`
 
 Input example:
 ```go
-&SendTaskToProcessInput{
-  Messages: []string{"hello", "world"},
-}
+&SendTaskToProcessInput{ Messages: []string{"hello", "world"} }
 ```
 
-Method used:
-`Execute(input *SendTaskToProcessInput)`
+Boundary method called: `TaskProcessorInterface.SendTaskToProcess(messages []string)`
+Transport: `TaskService.ReceiveTaskToProcess(stream ReceiveTaskToProcessRequest)` (gRPC client-streaming)
 
-Boundary method called:
-`TaskProcessorInterface.SendTaskToProcess(messages []string)`
-
-Transport used by the adapter:
-`TaskService.ReceiveTaskToProcess(stream ReceiveTaskToProcessRequest)`
-
-What is sent over gRPC:
-one streamed message per client message, with `message = "hello"` and `message = "world"`
-
-Output type:
-`SendTaskToProcessOutput`
-
-Output example:
-```go
-&SendTaskToProcessOutput{
-  Success: true,
-  Tasks: []entities.Task{
-    {
-      ID:         "550e8400-e29b-41d4-a716-446655440000",
-      Message:    "hello",
-      BinaryCode: "",
-      CreatedAt:  "2026-04-22 10:00",
-      UpdatedAt:  "2026-04-22 10:00",
-    },
-    {
-      ID:         "550e8400-e29b-41d4-a716-446655440001",
-      Message:    "world",
-      BinaryCode: "",
-      CreatedAt:  "2026-04-22 10:01",
-      UpdatedAt:  "2026-04-22 10:01",
-    },
-  },
-}
-```
-
-### 2 - Task Service, create flow
-
-Use case:
-`ReceiveTaskToProcessUseCase`
-
-Input type:
-`ReceiveTaskToProcessInput`
-
-Input example:
-```go
-&ReceiveTaskToProcessInput{
-  Message: "hello",
-}
-```
-
-Method used:
-`Execute(input *ReceiveTaskToProcessInput)`
-
-Boundary methods called:
-`IDGeneratorInterface.GenerateID()`
-`TaskProcessorInterface.MoveTaskToProcessing(createTaskDto CreateTaskDTO)`
-
-Transport used by the adapter:
-`TaskService.ReceiveTaskToProcess(stream ReceiveTaskToProcessRequest)`
-
-What happens on the wire:
-- API Gateway streams the original message into Task Service through gRPC
-- Task Service inserts the task row into Postgres
-- Task Service writes an unprocessed event row into the outbox table in Postgres for the Event Publisher
-
-Output type:
-`ReceiveTaskToProcessOutput`
-
-Output example:
-```go
-&ReceiveTaskToProcessOutput{
-  Success: true,
-  Task: entities.Task{
-    ID:         "550e8400-e29b-41d4-a716-446655440000",
-    Message:    "hello",
-    BinaryCode: "",
-    CreatedAt:  "2026-04-22 10:00",
-    UpdatedAt:  "2026-04-22 10:00",
-  },
-}
-```
-
-The same flow repeats for `"world"`, producing a second task.
+### 2 - Task Service (create flow)
+Use case: `ReceiveTaskToProcessUseCase` — inserts a task row and writes an unprocessed outbox event.
 
 ### 3 - Event Publisher
-
-Use case:
-`ProcessUnprocessedEventsUseCase`
-
-Input type:
-`ProcessUnprocessedEventsInput`
-
-Method used:
-`Execute(input *ProcessUnprocessedEventsInput)`
-
-Repository method called:
-`GetUnprocessedEvents(100, 0)`
-
-RabbitMQ boundary methods called:
-`RemoteEventProcessorInterface.SendToQueue(event entities.Event)`
-`EventProcessorInterface.SendEventToProcess(event entities.Event)`
-
-Transport used by the adapter:
-`Postgres` for the outbox read, then `RabbitMQ` for the publish step
-
-What happens on the wire:
-- The Event Publisher polls Postgres for unprocessed outbox events
-- It publishes each event to RabbitMQ through the queue flow
-- The processing worker consumes the queued message and starts the processing flow
-
-Output type:
-`ProcessUnprocessedEventsOutput`
-
-Output example:
-```go
-&ProcessUnprocessedEventsOutput{}
-```
+Use case: `ProcessUnprocessedEventsUseCase` — polls outbox, publishes queue messages (RabbitMQ)
 
 ### 4 - Processing Service
+Use case: `ProcessTaskUseCase` — reads task by ID, converts `message` → `BinaryCode`, sends processed payload back via gRPC
 
-Use case:
-`ProcessTaskUseCase`
+### 5 - Task Service (processed flow)
+Use case: `ReceiveProcessedTaskUseCase` — marks task as processed and writes processed outbox event
 
-Input type:
-`ProcessTaskInput`
-
-Input example:
-```go
-&ProcessTaskInput{
-  ID: "550e8400-e29b-41d4-a716-446655440000",
-}
-```
-
-Method used:
-`Execute(input *ProcessTaskInput)`
-
-Boundary methods called:
-`TaskRepositoryInterface.GetTaskByID(taskID string)`
-`TaskProcessorInterface.FinishProcessing(dto FinishProcessingDTO)`
-
-Transport used by the adapter:
-`gRPC` for the processed-task callback, while the current code keeps the task read-by-ID behind a repository boundary
-
-What happens on the wire:
-- Processing Service reads the task data it needs by ID
-- After conversion, it streams the processed payload back to Task Service through gRPC so Task Service can mark the task as processed
-
-Output type:
-`ProcessTaskOutput`
-
-Output example:
-```go
-&ProcessTaskOutput{
-  ID: "550e8400-e29b-41d4-a716-446655440000",
-  BinaryCode: "0110100001100101011011000110110001101111",
-}
-```
-
-### 5 - Task Service, processed flow
-
-Use case:
-`ReceiveProcessedTaskUseCase`
-
-Input type:
-`ReceiveProcessedTaskInput`
-
-Input example:
-```go
-&ReceiveProcessedTaskInput{
-  ID: "550e8400-e29b-41d4-a716-446655440000",
-}
-```
-
-Method used:
-`Execute(input *ReceiveProcessedTaskInput)`
-
-Boundary method called:
-`TaskProcessorInterface.FinishProcessing(dto FinishProcessingDTO)`
-
-Transport used by the adapter:
-`gRPC`
-
-What is sent over gRPC:
-the processed task ID together with `BinaryCode`
-
-What is updated in the database:
-the task row is updated in Postgres to mark it as processed
-
-Output type:
-`ReceiveProcessedTaskOutput`
-
-Output example:
-```go
-&ReceiveProcessedTaskOutput{
-  Success: true,
-}
-```
-
-### 6 - Event Publisher, fanout flow
-
-Use case:
-`SendProcessedEventsUseCase`
-
-Input type:
-`SendProcessedEventsInput`
-
-Method used:
-`Execute(input *SendProcessedEventsInput)`
-
-Repository method called:
-`GetProcessedEvents(100, 0)`
-
-RabbitMQ boundary methods called:
-`RemoteEventProcessorInterface.SendFanoutEvent(event entities.Event)`
-`EventProcessorInterface.SendFanoutEvent(event entities.Event)`
-
-Transport used by the adapter:
-`Postgres` for the outbox read, then `RabbitMQ` for the publish step
-
-What happens on the wire:
-- The Event Publisher polls Postgres for processed outbox events after Task Service marks the task as processed
-- It publishes each event to RabbitMQ through the fanout flow
-- The WebSocket side consumes the broadcast and pushes it to the client
-
-Output type:
-`SendProcessedEventsOutput`
-
-Output example:
-```go
-&SendProcessedEventsOutput{}
-```
+### 6 - Event Publisher (fanout)
+Use case: `SendProcessedEventsUseCase` — publishes processed events to fanout exchange
 
 ### 7 - WebSocket Service
+Use case: `SendProcessedTasksUseCase` — pushes `Task{ID, BinaryCode}` to clients
 
-Use case:
-`SendProcessedTasksUseCase`
+## Notes and next steps
 
-Input type:
-`SendProcessedTasksInput`
+- The repository contains generated gRPC stubs in each service; if you change proto files, regenerate the stubs.
+- For a stronger contract, consider switching the processed-task stream to a structured message (e.g. `ProcessedTask { id, binary_code }`) instead of `repeated string`.
+- Add DB migrations (DDL) for `tasks` and `outbox_events` if you plan to bootstrap a fresh environment.
 
-Input example:
-```go
-&SendProcessedTasksInput{
-  Task: entities.Task{
-    ID: "550e8400-e29b-41d4-a716-446655440000",
-    BinaryCode: "0110100001100101011011000110110001101111",
-  },
-}
-```
+## Author
 
-Method used:
-`Execute(input *SendProcessedTasksInput)`
-
-Boundary method called:
-`WebSocketClient.SendProcessedTasksToClient(task entities.Task)`
-
-Transport used by the adapter:
-`WebSocket`
-
-What is pushed to the client:
-`Task{ID, BinaryCode}`
-
-Output type:
-`SendProcessedTasksOutput`
-
-Output example:
-```go
-&SendProcessedTasksOutput{}
-```
-
-### Result
-
-For each message in the original batch, the system follows this chain:
-
-`SendTaskToProcessUseCase -> ReceiveTaskToProcessUseCase -> ProcessUnprocessedEventsUseCase -> ProcessTaskUseCase -> ReceiveProcessedTaskUseCase -> SendProcessedEventsUseCase -> SendProcessedTasksUseCase`
-
-The client gets the final update through WebSocket as a `Task` with `ID` and `BinaryCode`.
-
-### Message path summary
-
-1. The client submits `messages[]` to the API Gateway.
-2. The API Gateway calls `SendTaskToProcessUseCase.Execute(...)` and streams the messages to Task Service through gRPC.
-3. The Task Service inserts the task rows into Postgres with an empty `BinaryCode`.
-4. The Task Service writes an unprocessed event row into the outbox table in Postgres.
-5. The `Event Publisher` reads `GetUnprocessedEvents(100, 0)` from Postgres and publishes each event to RabbitMQ through `SendToQueue(...)`.
-6. The processing worker consumes the queued message and runs `ProcessTaskUseCase.Execute(...)`.
-7. The Processing Service reads the task by ID, converts `message` into `binaryCode`, and sends the processed payload back to Task Service through gRPC.
-8. The Task Service updates the task row in Postgres and marks it as processed.
-9. The `Event Publisher` reads `GetProcessedEvents(100, 0)` from Postgres and publishes each event to RabbitMQ through `SendFanoutEvent(...)`.
-10. The WebSocket Service receives the fanout event and pushes `Task{ID, BinaryCode}` to the client.
-
-## Author:
-<a href="https://github.com/DouglasVolcato?tab=repositories">Douglas Volcato</a>
+Douglas Volcato — https://github.com/DouglasVolcato
