@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,16 +12,19 @@ import (
 	"github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/processor"
 	"github.com/douglasvolcato/binary-code-processor/event_publisher/internal/infra/rabbitmq"
 	"github.com/douglasvolcato/binary-code-processor/event_publisher/internal/usecases"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 const defaultDatabaseURL = "postgres://postgres:postgres@localhost:5432/task_service?sslmode=disable"
 const defaultRabbitURL = "amqp://guest:guest@localhost:5672/"
+const defaultMetricsPort = "8084"
 
 func main() {
 	loadDotEnv()
 
 	databaseURL := getenv("DATABASE_URL", defaultDatabaseURL)
 	rabbitURL := getenv("RABBITMQ_URL", defaultRabbitURL)
+	metricsPort := getenv("METRICS_PORT", defaultMetricsPort)
 
 	db, err := database.NewDB(databaseURL)
 	if err != nil {
@@ -51,6 +55,8 @@ func main() {
 		interval = 5 * time.Second
 	}
 
+	go serveHTTPMetrics(metricsPort)
+
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 
@@ -62,6 +68,24 @@ func main() {
 			log.Println("send processed events:", err)
 		}
 		<-ticker.C
+	}
+}
+
+func serveHTTPMetrics(port string) {
+	mux := http.NewServeMux()
+	mux.Handle("/health", healthHandler())
+	mux.Handle("/healthz", healthHandler())
+	mux.Handle("/metrics", promhttp.Handler())
+
+	server := &http.Server{
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	log.Printf("event publisher metrics listening on :%s", port)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
 	}
 }
 
@@ -100,4 +124,11 @@ func getenv(key string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func healthHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 }

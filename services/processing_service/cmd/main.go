@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	taskgrpc "github.com/douglasvolcato/binary-code-processor/processing_service/internal/infra/grpc"
 	"github.com/douglasvolcato/binary-code-processor/processing_service/internal/queue"
 	"github.com/douglasvolcato/binary-code-processor/processing_service/internal/usecases"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -19,6 +21,7 @@ import (
 const defaultRabbitURL = "amqp://guest:guest@localhost:5672/"
 const defaultTaskServiceAddr = "localhost:50051"
 const defaultQueueName = "task.process"
+const defaultMetricsPort = "8083"
 
 type eventMessage struct {
 	ID string `json:"id"`
@@ -30,6 +33,7 @@ func main() {
 	rabbitURL := getenv("RABBITMQ_URL", defaultRabbitURL)
 	taskServiceAddr := getenv("TASK_SERVICE_ADDR", defaultTaskServiceAddr)
 	queueName := getenv("PROCESS_QUEUE", defaultQueueName)
+	metricsPort := getenv("METRICS_PORT", defaultMetricsPort)
 
 	dialCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -39,6 +43,8 @@ func main() {
 		log.Fatal(err)
 	}
 	defer conn.Close()
+
+	go serveHTTPMetrics(metricsPort)
 
 	client := taskgrpc.NewClient(conn)
 	usecase := usecases.NewProcessTaskUseCase(client, client)
@@ -72,6 +78,24 @@ func main() {
 	}
 
 	select {}
+}
+
+func serveHTTPMetrics(port string) {
+	mux := http.NewServeMux()
+	mux.Handle("/health", healthHandler())
+	mux.Handle("/healthz", healthHandler())
+	mux.Handle("/metrics", promhttp.Handler())
+
+	server := &http.Server{
+		Addr:              ":" + port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	log.Printf("processing service metrics listening on :%s", port)
+	if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
 }
 
 func loadDotEnv() {
@@ -109,4 +133,11 @@ func getenv(key string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func healthHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	})
 }

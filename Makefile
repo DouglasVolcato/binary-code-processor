@@ -34,7 +34,7 @@ test-bench:
 	@$(MAKE) test-bench-websocket_service
 
 k8s-up:
-	k3d cluster create binary-code-processor -p "8080:30080@loadbalancer" -p "8082:30082@loadbalancer" -p "15672:31572@loadbalancer" -p "9090:30900@loadbalancer" -p "5432:30432@loadbalancer"
+	k3d cluster create binary-code-processor -p "8080:30080@loadbalancer" -p "8082:30082@loadbalancer" -p "15672:31572@loadbalancer" -p "9090:30900@loadbalancer" -p "30091:30091@loadbalancer" -p "5432:30432@loadbalancer"
 	k3d image import api_gateway:latest -c binary-code-processor
 	k3d image import task_service:latest -c binary-code-processor
 	k3d image import processing_service:latest -c binary-code-processor
